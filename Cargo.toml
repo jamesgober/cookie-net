@@ -1,0 +1,69 @@
+# =============================================================================
+#  R E P S   ·   cookie-net
+# =============================================================================
+[package]
+name    = "cookie-net"
+version = "0.1.0"
+
+# Minimum Supported Rust Version (MSRV)
+rust-version = "1.85"
+edition = "2024"
+
+# License
+license = "Apache-2.0 OR MIT"
+
+# Readme
+readme = "README.md"
+
+# Description
+description = "HTTP cookies for Rust (RFC 6265bis): strict parsing of Cookie headers, Set-Cookie serialization with Secure, HttpOnly, SameSite, Max-Age and the __Host- and __Secure- prefixes, plus signed and encrypted cookies."
+
+# Keywords (5 max)
+keywords = ["cookie", "http", "session", "web", "security"]
+
+# Categories
+categories = ["web-programming"]
+
+# Links
+homepage      = "https://github.com/jamesgober/cookie-net"
+repository    = "https://github.com/jamesgober/cookie-net"
+documentation = "https://docs.rs/cookie-net"
+
+# Authors
+authors = ["James Gober <me@jamesgober.com>"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lib]
+name = "cookie_net"
+path = "src/lib.rs"
+
+
+# FEATURE FLAGS
+# #################################
+[features]
+default = []
+
+
+# DEPENDENCIES
+# #################################
+[dependencies]
+# None yet. Planned dependencies and the reason for each are listed in
+# dev/PLAN.md; each is added with the first code that needs it.
+
+
+# DEV DEPENDENCIES
+# #################################
+[dev-dependencies]
+
+
+# RELEASE PROFILE
+# #################################
+[profile.release]
+opt-level     = 3
+lto           = "fat"
+codegen-units = 1
+panic         = "abort"
+strip         = "symbols"
