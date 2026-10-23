@@ -578,14 +578,38 @@ pub(crate) fn decode_expiry(e: u32) -> Option<u64> {
     (e != 0).then(|| EPOCH_2020 + u64::from(e))
 }
 
-/// Feeds the length-prefixed name and binding into a MAC or hash.
-pub(crate) fn feed_name_and_binding(mac: &mut Blake3Mac, name: &[u8], bound_to: &[u8]) {
+/// Inputs up to this many bytes are hashed in one call from a stack buffer.
+const ONE_SHOT: usize = 512;
+
+/// Keyed BLAKE3 of the concatenation of `parts`. Short inputs (all real
+/// cookies) are copied into a stack buffer and hashed in one call, which
+/// costs about a third of feeding the same bytes through several `update`
+/// calls; longer ones stream. Both give the same output.
+pub(crate) fn keyed_hash(subkey: &[u8; KEY_LEN], parts: &[&[u8]]) -> [u8; 32] {
+    let total = parts.iter().fold(0usize, |n, p| n.saturating_add(p.len()));
+    if total <= ONE_SHOT {
+        let mut buf = [0u8; ONE_SHOT];
+        let mut at = 0;
+        for p in parts {
+            if let Some(dst) = buf.get_mut(at..at + p.len()) {
+                dst.copy_from_slice(p);
+            }
+            at += p.len();
+        }
+        return blake3_keyed(subkey, buf.get(..at).unwrap_or(&[]));
+    }
+    let mut m = Blake3Mac::new(subkey);
+    for p in parts {
+        m.update(p);
+    }
+    m.finalize()
+}
+
+/// The length prefixes of a name and a binding, as they enter a MAC.
+pub(crate) fn length_prefixes(name: &[u8], bound_to: &[u8]) -> ([u8; 2], [u8; 4]) {
     let name_len = u16::try_from(name.len()).unwrap_or(u16::MAX);
     let bind_len = u32::try_from(bound_to.len()).unwrap_or(u32::MAX);
-    mac.update(&name_len.to_be_bytes());
-    mac.update(name);
-    mac.update(&bind_len.to_be_bytes());
-    mac.update(bound_to);
+    (name_len.to_be_bytes(), bind_len.to_be_bytes())
 }
 
 /// Checks a cookie name for signing or sealing.
@@ -724,6 +748,20 @@ mod tests {
         );
         assert_eq!(decode_expiry(0), None);
         assert_eq!(decode_expiry(5), Some(EPOCH_2020 + 5));
+    }
+
+    #[test]
+    fn test_keyed_hash_one_shot_equals_streaming() {
+        let key = [9u8; 32];
+        for total in [0usize, 1, 100, 511, 512, 513, 2000] {
+            let data: std::vec::Vec<u8> = (0..total).map(|i| i as u8).collect();
+            let (a, b) = data.split_at(total / 3);
+            let mut m = Blake3Mac::new(&key);
+            m.update(a);
+            m.update(b);
+            assert_eq!(keyed_hash(&key, &[a, b]), m.finalize(), "{total}");
+            assert_eq!(keyed_hash(&key, &[&data]), blake3_keyed(&key, &data));
+        }
     }
 
     #[test]

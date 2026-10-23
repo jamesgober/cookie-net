@@ -126,8 +126,13 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-audit,cargo-deny
+      # The newest version of every dependency, as a consumer on current Rust
+      # resolves them; the 1.85 resolution can hold older patch releases
+      # whose fixes need a newer Rust (dev/PLAN.md D-078).
       - name: Generate lockfile
         run: cargo generate-lockfile
+        env:
+          CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: allow
       - name: Audit
         run: cargo audit
       - name: Deny

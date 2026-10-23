@@ -12,7 +12,7 @@
 
 use core::fmt;
 
-use crypt_io::{Tag, mac::Blake3Mac};
+use crypt_io::Tag;
 use parse_net::Sink;
 
 use crate::{
@@ -511,12 +511,11 @@ impl fmt::Debug for Signer {
 }
 
 fn mac(subkey: &[u8; 32], head: &[u8], name: &[u8], bound_to: &[u8], value: &[u8]) -> [u8; 16] {
-    let mut m = Blake3Mac::new(subkey);
-    m.update(LABEL);
-    m.update(head);
-    keys::feed_name_and_binding(&mut m, name, bound_to);
-    m.update(value);
-    let full = m.finalize();
+    let (name_len, bind_len) = keys::length_prefixes(name, bound_to);
+    let full = keys::keyed_hash(
+        subkey,
+        &[LABEL, head, &name_len, name, &bind_len, bound_to, value],
+    );
     let mut tag = [0u8; 16];
     tag.copy_from_slice(&full[..16]);
     tag

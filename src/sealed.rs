@@ -14,7 +14,7 @@
 use alloc::{string::String, vec::Vec};
 use core::fmt;
 
-use crypt_io::{Crypt, Zeroizing, mac::Blake3Mac};
+use crypt_io::{Crypt, Zeroizing};
 use parse_net::Sink;
 
 use crate::{
@@ -497,9 +497,8 @@ impl fmt::Debug for Sealer {
 }
 
 fn aad(subkey: &[u8; 32], header: &[u8], name: &[u8], bound_to: &[u8]) -> [u8; AAD] {
-    let mut m = Blake3Mac::new(subkey);
-    keys::feed_name_and_binding(&mut m, name, bound_to);
-    let digest = m.finalize();
+    let (name_len, bind_len) = keys::length_prefixes(name, bound_to);
+    let digest = keys::keyed_hash(subkey, &[&name_len, name, &bind_len, bound_to]);
     let mut aad = [0u8; AAD];
     let (label, rest) = aad.split_at_mut(LABEL.len());
     label.copy_from_slice(LABEL);

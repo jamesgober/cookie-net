@@ -24,6 +24,10 @@ fn check(data: &[u8], limits: &Limits) {
             assert!(value.is_ascii() && !value.contains(&b' '));
         }
         // the first match and the unique lookup agree with the iteration
+        // (checked for the first 16 pairs, so the oracle stays linear)
+        if n > 16 {
+            continue;
+        }
         let first = cookies.get(pair.name());
         assert!(first.is_some());
         match cookies.get_unique(pair.name()) {
