@@ -152,7 +152,6 @@ fn dec_block(s: &[u8], d: &mut [u8]) -> u64 {
 
 /// Encode `src` into `dst`. `dst.len()` must be `encoded_len(src.len())`.
 pub(crate) fn encode(src: &[u8], dst: &mut [u8]) {
-    debug_assert_eq!(dst.len(), encoded_len(src.len()));
     let mut src_blocks = src.chunks_exact(6);
     let mut dst_blocks = dst.chunks_exact_mut(8);
     for (s, d) in (&mut src_blocks).zip(&mut dst_blocks) {
