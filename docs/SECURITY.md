@@ -67,6 +67,7 @@ cookie-net reads `Cookie` headers, writes `Set-Cookie` headers, signs and encryp
 - **Tossing of non-prefixed cookies.** Without `__Host-`, a sibling subdomain can set a cookie of the same name; cookie-net reports duplicates but cannot tell which one is genuine.
 - **Old browsers** that ignore prefixes or `SameSite`; the server-side checks still hold.
 - **Key custody.** cookie-net never stores keys; protecting them is the caller's (key-vault).
+- **Advisories in code it does not call.** CI audits the dependency tree on every change. One advisory is known and unreachable: RUSTSEC-2026-0385 (`ctutils` before 0.4.4) is fixed only in releases that need Rust 1.87, so a build on Rust 1.85 or 1.86 still resolves the old version. It reaches the tree through `digest`'s MAC verification, which cookie-net never calls; tags are compared with crypt-io's `Tag::ct_eq` (dev/PLAN.md D-078).
 
 ## Hardening evidence
 
