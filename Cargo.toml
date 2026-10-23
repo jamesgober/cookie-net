@@ -3,7 +3,7 @@
 # =============================================================================
 [package]
 name    = "cookie-net"
-version = "0.1.0"
+version = "0.2.0"
 
 # Minimum Supported Rust Version (MSRV)
 rust-version = "1.85"
@@ -44,14 +44,37 @@ path = "src/lib.rs"
 # FEATURE FLAGS
 # #################################
 [features]
-default = []
+# Declared at the 0.2.0 design lock, ahead of their code (docs/API.md,
+# "Feature flags"; dev/PLAN.md D-016). Each gains its dependencies with the
+# first code that needs them: parse-net at 0.3, crypt-io at 0.4.
+default = ["std"]
+
+# `*_now` functions that read the system clock. Implies `alloc`.
+std = ["alloc"]
+
+# `SetCookie::encode` and the `String`-returning `sign*` and `seal*` functions.
+alloc = []
+
+# Signed cookies: `Key`, `KeyRing`, `Signer` (0.4).
+signed = []
+
+# Encrypted cookies: `Sealer`, `Plaintext`, `Opened` (0.4). Needs the OS
+# random source, so it implies `std`.
+encrypted = ["signed", "std"]
+
+# Client side: `parse_set_cookie`, `cookie_date` (0.5).
+client = []
+
+# The client cookie jar (0.5).
+jar = ["client", "alloc"]
 
 
 # DEPENDENCIES
 # #################################
 [dependencies]
-# None yet. Planned dependencies and the reason for each are listed in
-# dev/PLAN.md; each is added with the first code that needs it.
+# None yet. parse-net (required) arrives at 0.3 and crypt-io (behind
+# `signed` and `encrypted`) at 0.4, both at published versions; the reason
+# for each is in dev/PLAN.md section 2.
 
 
 # DEV DEPENDENCIES

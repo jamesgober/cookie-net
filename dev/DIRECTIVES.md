@@ -1,4 +1,4 @@
-# cookie-net &mdash; Engineering Directives
+# cookie-net - Engineering Directives
 
 > Engineering standards and the definition of done for this project. Read alongside `REPS.md` (root, authoritative), [`PLAN.md`](./PLAN.md) (design and decisions), and [`ROADMAP.md`](./ROADMAP.md) (current phase). If anything here conflicts with `REPS.md`, `REPS.md` wins, except where `PLAN.md` records an approved exception.
 

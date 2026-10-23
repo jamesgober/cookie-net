@@ -11,10 +11,39 @@
 
 ## [Unreleased]
 
+---
+
+## [0.2.0] - 2026-10-23
+
+The design lock: the public API through 1.0, written down before the code. No
+cookie code yet.
+
+### Added
+
+- `docs/API.md`: every public item from `0.3.0` to `1.0.0` with its id, grade,
+  tier, shipping version, signature, behaviour, every error it can return, cost
+  target, and examples: reading the `Cookie` header (`get`, `get_unique`,
+  `locate` with shadow names), writing `Set-Cookie` with the rfc6265bis rules
+  checked at build time, the session helpers, keys and staged rotation, signed
+  and encrypted cookies with expiry and session binding, the client parser and
+  cookie jar, and five use cases.
+- Feature flags declared ahead of their code: `std` (default), `alloc`,
+  `signed`, `encrypted`, `client`, `jar`. The crate root is `no_std`.
+
 ### Changed
 
-- `dev/PLAN.md` section 4a: the session cookies (`__Host-sid`, `__Host-sudo`,
-  CSRF) and why session tokens are opaque rather than signed or encrypted.
+- `dev/PLAN.md` rewritten from the crate specification: requirements, the
+  enterprise and distributed design, session cookies (no CSRF cookie;
+  `__Host-sudo` on `Path=/`), architecture, threats T1 to T28, performance
+  targets, testing, defence ideas, requests to other crates, and decisions
+  D-004 to D-042. Signed cookies move from HMAC-SHA-256 to keyed BLAKE3,
+  encrypted cookies to XChaCha20-Poly1305, and keys are passed in by the
+  caller instead of read from key-vault.
+- `dev/ROADMAP.md`: every version from 0.1 to 1.0 with exit criteria.
+- `dev/PLAN.md` section on the session cookies (merged before this release):
+  `__Host-sid`, `__Host-sudo`, and why session tokens are opaque rather than
+  signed or encrypted.
+- README: scope and status brought in line with the plan.
 
 ---
 
@@ -30,5 +59,6 @@ The scaffold and the plan. No functional code yet.
 - `dev/PLAN.md` (purpose, scope, architecture, threats, ecosystem, open
   decisions, decision log), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 
-[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jamesgober/cookie-net/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/jamesgober/cookie-net/releases/tag/v0.1.0
