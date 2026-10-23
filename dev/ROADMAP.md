@@ -64,7 +64,7 @@ Exit: every P0, P1, P2 item exists with doctests; web-platform-tests-derived cas
 
 ## v0.6.0 - Optimisation
 
-- [x] criterion benchmarks against `cookie`, `biscotti`, and `cookie_store` for every row of PLAN section 10, in the separate repository cookie-net-bench, with a load-robust ratio tool (D-074); `docs/PERFORMANCE.md` with method and hardware.
+- [x] criterion benchmarks against `cookie`, `biscotti`, and `cookie_store` for every row of PLAN section 10, in the separate repository cookie-net-bench, with a ratio tool that holds steady under load (D-074); `docs/PERFORMANCE.md` with method and hardware.
 - [x] The jar's per-domain index: not needed; the jar is 57% faster than `cookie_store` with a linear scan (D-067 stands).
 - [x] In-crate criterion benches as the regression baseline.
 - [x] Optimisations: one-shot keyed BLAKE3 (D-070), one UTF-8 check per line (D-071), a smaller prefixed-duplicate table (D-072).

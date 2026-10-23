@@ -817,7 +817,10 @@ fn classify<'a>(seg: &'a [u8], limits: &Limits, text: Option<&'a str>) -> Option
         // `seg` lies inside the line `text` was made from.
         let at = (name.as_ptr() as usize).wrapping_sub(text.as_ptr() as usize);
         let value_at = at + eq + 1;
-        if let (Some(n), Some(v)) = (text.get(at..at + eq), text.get(value_at..value_at + value.len())) {
+        if let (Some(n), Some(v)) = (
+            text.get(at..at + eq),
+            text.get(value_at..value_at + value.len()),
+        ) {
             return Some(Pair { name: n, value: v });
         }
     }
