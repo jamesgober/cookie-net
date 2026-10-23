@@ -50,6 +50,63 @@ jobs:
         env:
           RUSTDOCFLAGS: "-D warnings"
 
+  no-std:
+    name: Bare metal (thumbv7em-none-eabi / ${{ matrix.rust }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: [stable, "1.85"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+          targets: thumbv7em-none-eabi
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: thumbv7em
+      # A target with no `std` at all proves the core never reaches for it
+      # and needs no allocator (dev/PLAN.md, NFR-6). `alloc` builds there too.
+      - name: Build (no features)
+        run: cargo build --target thumbv7em-none-eabi --no-default-features
+      - name: Build (alloc)
+        run: cargo build --target thumbv7em-none-eabi --no-default-features --features alloc
+      - name: Clippy (no features)
+        run: cargo clippy --target thumbv7em-none-eabi --no-default-features -- -D warnings
+
+  dependencies:
+    name: First-party runtime dependencies only
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      # NFR-7: without the crypto features, parse-net is the whole tree.
+      - name: Check the dependency tree
+        run: |
+          tree=$(cargo tree --edges normal --prefix none --features alloc,client,jar | sort -u)
+          echo "$tree"
+          extra=$(echo "$tree" | grep -v -E '^(cookie-net|parse-net) ' || true)
+          if [ -n "$extra" ]; then echo "unexpected dependencies: $extra"; exit 1; fi
+
+  fuzz-build:
+    name: Fuzz targets build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+      - name: Install cargo-fuzz
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+      - name: Build every target
+        working-directory: fuzz
+        run: cargo fuzz build
+
   security:
     name: Security (audit + deny)
     runs-on: ubuntu-latest

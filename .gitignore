@@ -17,3 +17,9 @@ Desktop.ini
 
 # Libraries do not commit the lockfile
 Cargo.lock
+
+# Fuzzing output (the corpus lives outside the repository; seeds are committed)
+/fuzz/target/
+/fuzz/corpus/
+/fuzz/artifacts/
+/fuzz/coverage/

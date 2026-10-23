@@ -4,7 +4,7 @@
 >
 > **Read order:** [`../REPS.md`](../REPS.md) &rarr; [`DIRECTIVES.md`](./DIRECTIVES.md) &rarr; **this file** &rarr; [`ROADMAP.md`](./ROADMAP.md) &rarr; [`../docs/API.md`](../docs/API.md) (the locked API).
 >
-> **Status:** `0.2.0`, design lock, API approved by James on 2026-10-23. Rewritten from the crate's specification (decision D-004). The public API is in `docs/API.md`; this file holds the reasons.
+> **Status:** `0.3.0`, plain cookies. API approved by James on 2026-10-23 at `0.2.0`. Rewritten from the crate's specification (decision D-004). The public API is in `docs/API.md`; this file holds the reasons.
 
 ---
 
@@ -417,9 +417,16 @@ At least one new defence idea per version, as hypothesis, method, and expected c
 | D-036 | 2026-10-23 | REPS's "MUST use tokio" clause does not apply | recorded as the standard asks: the stack's cores are sans-IO with no async runtime |
 | D-037 | 2026-10-23 | Opened plaintext is cookie-net's own `Plaintext` type, wiped on drop, instead of crypt-io's re-exported `Zeroizing` | no third-party type in the public API |
 | D-038 | 2026-10-23 | Every extensible enum and every result struct is `#[non_exhaustive]` (`CookieError`, `Ambiguous`, `Rejected`, `ValueMode`, `SameSite`, `Prefix`, `Lookup`, `Located`, `Stats`, `Verified`, `Opened`, `KeyRole`, `SetCookieView`, `SameSiteAttr`, `StoreOutcome`, `IgnoreReason`) | variants and fields can be added in minor releases |
-| D-039 | 2026-10-23 | `Stats::prefixed_duplicates` is computed in linear time: prefixed names are hashed into a fixed table sized to the pair limit, with an exact compare on a hash match | NFR-2: no pairwise comparison, no allocation; the design is confirmed with a complexity test at 0.3 |
+| D-039 | 2026-10-23 | `Stats::prefixed_duplicates` is computed in linear time: prefixed names go into a fixed open-addressed table of 64 slots (FNV-1a hash, exact compare on a match); names past the first 64 distinct prefixed ones are not tracked, so the count can only be low, never high | NFR-2: no pairwise comparison, no allocation, 1 KiB of stack; a site with more than 64 distinct prefixed cookies does not exist in practice, and a flood of distinct prefixed names still shows in `pairs` and `truncated`. Complexity tests confirm linear time |
 | D-040 | 2026-10-23 | `locate` returns `Located { lookup, shadows, stats }` (the specification returned `Lookup`), with `severity_hint`; `Stats` gains `too_long` | one pass gives the gateway every fact it scores; shadow names are the 0.3 defence idea |
 | D-041 | 2026-10-23 | `Limits` and `JarLimits` setters are `const` and clamp to their documented ranges | `const` configuration cannot fail; the getters show what is in force |
 | D-042 | 2026-10-23 | `Signer::new`, `Sealer::new`, and `with_ring` refuse a key whose 32 bytes are all equal (`WeakKey`) | catches an unset or zeroed key at boot, as csrf-sec does |
 | D-043 | 2026-10-23 | 0.1.0 published from the scaffold commit before 0.2.0 (CN-1, decided by James); the API in `docs/API.md` approved by James the same day | claims the name; every version ships through the release routine |
 | D-044 | 2026-10-23 | The 0.2 exit item "gate-net and the WASP gates confirm the session helpers" moves to 0.8 | neither consumer has code yet; the helpers follow gate-net's written design and the X-6 decision, and 0.8 is where the gates are built on cookie-net |
+| D-045 | 2026-10-23 | parse-net `0.6.1` is the minimum version | 0.6.0 refused some `If-None-Match` lists (fixed in 0.6.1); cookie-net uses only the byte classes, `find_byte`, `HttpDate`, and the sinks, which are unchanged since 0.3 |
+| D-046 | 2026-10-23 | A deletion still applies rule 3 (name at most 4096 bytes); `docs/API.md` said it skipped it | a deletion with an over-long name would be ignored by browsers, which is exactly what rule 3 refuses |
+| D-047 | 2026-10-23 | `Domain` is also refused over 253 bytes and when its last label is all digits | DNS names are at most 253 bytes; no top-level domain is numeric, so the rule refuses IPv4 addresses without a separate parser |
+| D-048 | 2026-10-23 | Shadow names compare ignoring ASCII case after removing a prefix from either side, so `SID` is a shadow of `__Host-sid` | a case variant of the bare name is as much a probe as one of the prefixed name; the cost is the same one comparison |
+| D-049 | 2026-10-23 | `SetCookie` is 232 bytes (eight inline extension slots) and stays `Copy` | no allocation and no lifetime juggling for extensions; cookies are built and written in place, so the size costs a copy of under 256 bytes at most [est. under 10 ns] |
+| D-050 | 2026-10-23 | Doctests that call `encode` are gated on `alloc` with hidden lines; unit and integration tests use `encode_into`, so every test runs without default features | the rendered examples stay one line, and `cargo test --no-default-features` still checks the `no_std` path |
+| D-051 | 2026-10-23 | CI gains a bare-metal `thumbv7em-none-eabi` build (no features, and `alloc`), a dependency-tree check (only parse-net), a fuzz-target build, and a weekly 20-minute fuzz run of every target | NFR-6 and NFR-7 checked on every push; fuzz targets cannot rot between the one-hour runs |

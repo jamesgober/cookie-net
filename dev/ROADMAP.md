@@ -27,21 +27,21 @@ Exit: crate on crates.io; CI green on every platform (done).
 - [x] `docs/API.md`: every public item with signature, behaviour, errors, grade, tier, version, cost, and examples.
 - [x] `dev/PLAN.md` rewritten from the specification; its differences recorded as decisions (D-004 to D-042).
 - [x] Open decisions CN-1 to CN-11 closed (CN-1 by James).
-- [x] James approved the API (2026-10-23).
+- [x] James approved the API (2026-10-23); 0.2.0 published the same day.
 - [ ] gate-net and the WASP gates confirm the session helpers match gate-net's session design (requests recorded in PLAN 13.2). **Moved to 0.8 (alpha)**, where the WASP gates are built on cookie-net: neither has code yet, and the helpers follow gate-net's written design and James's X-6 decision.
 
 Exit: the API is approved (done). Then the release routine for 0.2.0 (no code beyond `VERSION`).
 
 ## v0.3.0 - Plain cookies (request side, response side, sessions)
 
-- [ ] ROOT-2; ERR-1 to ERR-4; LIM-1, LIM-2.
-- [ ] REQ-1 to REQ-13: `parse`, `get`, `get_unique`, `get_all`, `Cookies` (single header and lines), `Pair`, `Stats`, `locate`, `Located` with shadow names, `Prefix`, redacted `Debug`.
-- [ ] SET-1 to SET-19: `SetCookie`, the builder, `SameSite`, every rule of the rules table with a test citing its rfc6265bis section, canonical serialization, deletion.
-- [ ] SES-1 to SES-3, SES-5: `session_cookie`, `elevated_cookie`, deletion of `__Host-` cookies, the token floor.
-- [ ] Compile-time `Send + Sync` assertions; `no_std` build of the core without an allocator in CI.
-- [ ] README rewritten from the template with the Tier 1 quick start.
+- [x] ROOT-2; ERR-1 to ERR-4; LIM-1, LIM-2.
+- [x] REQ-1 to REQ-13: `parse`, `get`, `get_unique`, `get_all`, `Cookies` (single header and lines), `Pair`, `Stats`, `locate`, `Located` with shadow names, `Prefix`, redacted `Debug`.
+- [x] SET-1 to SET-19: `SetCookie`, the builder, `SameSite`, every rule of the rules table with a test citing its rfc6265bis section, canonical serialization, deletion.
+- [x] SES-1 to SES-3, SES-5: `session_cookie`, `elevated_cookie`, deletion of `__Host-` cookies, the token floor.
+- [x] `Send + Sync` assertions; `no_std` build of the core without an allocator in CI (`thumbv7em-none-eabi`).
+- [x] README rewritten from the template with the Tier 1 quick start; examples `01_quick_start`, `02_sessions`.
 
-Exit: every rule has a test citing its section; a property test shows no builder input breaks a prefix, `SameSite=None`, or `Partitioned` rule; counting-allocator tests pass; the crumb-split test passes; the prefixed-duplicate complexity test is linear; fuzz targets `cookie_header`, `cookie_lines`, `locate`, `set_cookie_build` run one hour clean.
+Exit: every rule has a test citing its section; a property test shows no builder input breaks a prefix, `SameSite=None`, or `Partitioned` rule; counting-allocator tests pass; the crumb-split test passes; the prefixed-duplicate complexity test is linear; fuzz targets `cookie_header`, `cookie_lines`, `locate`, `set_cookie_build` run one hour clean. **Met 2026-10-23.**
 
 ## v0.4.0 - Signed and encrypted
 

@@ -1,0 +1,47 @@
+[package]
+name = "cookie-net-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+parse-net = "0.6.1"
+
+[dependencies.cookie-net]
+path = ".."
+
+# Keeps this crate out of any parent workspace.
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "cookie_header"
+path = "fuzz_targets/cookie_header.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "cookie_lines"
+path = "fuzz_targets/cookie_lines.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "locate"
+path = "fuzz_targets/locate.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "set_cookie_build"
+path = "fuzz_targets/set_cookie_build.rs"
+test = false
+doc = false
+bench = false
