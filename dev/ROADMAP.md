@@ -64,10 +64,14 @@ Exit: every P0, P1, P2 item exists with doctests; web-platform-tests-derived cas
 
 ## v0.6.0 - Optimisation
 
-- [ ] criterion benchmarks against `cookie`, `biscotti`, and `cookie_store` for every row of PLAN section 10, in a separate comparison repository (competitors never enter this crate's dependency tree); `docs/PERFORMANCE.md` with method and hardware.
-- [ ] Decide the jar's per-domain index from the `cookie_store` comparison (PLAN D-067).
+- [x] criterion benchmarks against `cookie`, `biscotti`, and `cookie_store` for every row of PLAN section 10, in the separate repository cookie-net-bench, with a load-robust ratio tool (D-074); `docs/PERFORMANCE.md` with method and hardware.
+- [x] The jar's per-domain index: not needed; the jar is 57% faster than `cookie_store` with a linear scan (D-067 stands).
+- [x] In-crate criterion benches as the regression baseline.
+- [x] Optimisations: one-shot keyed BLAKE3 (D-070), one UTF-8 check per line (D-071), a smaller prefixed-duplicate table (D-072).
 
-Exit: each comparable row is at least 20% faster than the best competitor, or has a recorded plan; no regression over 5%.
+Exit: each comparable row is at least 20% faster than the best competitor, or has a recorded plan; no regression over 5%. **Met 2026-10-23**: every row but C8 and C9 is 20% or more faster; C8 and C9 (sealing) have the recorded plan of D-073.
+
+**Moved, with reason:** the C8 and C9 target moves to the version after crypt-io ships XAES-256-GCM (D-073); the fix is a cipher crypt-io must provide, and cookie-net never implements cryptography itself.
 
 ## v0.7.0 - Hardening
 

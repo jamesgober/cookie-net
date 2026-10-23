@@ -139,7 +139,7 @@ pub struct Stats {
     /// or more whitespace.
     pub loose_separators: u16,
     /// Extra occurrences of `__Host-` or `__Secure-` names (byte-exact
-    /// repeats). The first 64 distinct prefixed names are tracked.
+    /// repeats). The first 16 distinct prefixed names are tracked.
     pub prefixed_duplicates: u16,
     /// The scan stopped at `max_pairs`.
     pub truncated: bool,
@@ -384,7 +384,9 @@ impl<'a> Cookies<'a> {
             if n == target {
                 count = count.saturating_add(1);
                 first.get_or_insert(p.value);
-            } else if name::core(n).eq_ignore_ascii_case(target_core) {
+            } else if could_shadow(n.len(), target_core.len())
+                && name::core(n).eq_ignore_ascii_case(target_core)
+            {
                 shadows = shadows.saturating_add(1);
             }
         }
@@ -667,6 +669,9 @@ struct Scanner<'a> {
     next_line: usize,
     /// What is left of the current line.
     rest: &'a [u8],
+    /// The current line as text, when it is valid UTF-8 (checked once per
+    /// line, so names and values need no check of their own).
+    text: Option<&'a str>,
     limits: Limits,
     stats: Stats,
     done: bool,
@@ -692,6 +697,7 @@ impl<'a> Scanner<'a> {
             src,
             next_line: 0,
             rest: &[],
+            text: None,
             limits,
             stats: Stats::default(),
             done: too_long,
@@ -709,6 +715,7 @@ impl<'a> Scanner<'a> {
         let Some(line) = line else { return false };
         self.next_line += 1;
         self.rest = trim_start(line);
+        self.text = core::str::from_utf8(line).ok();
         true
     }
 
@@ -759,7 +766,7 @@ impl<'a> Scanner<'a> {
                 self.stats.empty = self.stats.empty.saturating_add(1);
                 continue;
             }
-            match classify(seg, &self.limits) {
+            match classify(seg, &self.limits, self.text) {
                 Some(pair) => {
                     if self.stats.pairs >= self.limits.pairs() {
                         self.stats.truncated = true;
@@ -775,8 +782,18 @@ impl<'a> Scanner<'a> {
     }
 }
 
+/// Whether a name of `len` bytes can be a shadow of a target whose name
+/// without its prefix is `core` bytes: its own core must be as long, so it is
+/// `core` plus 0, 7 (`__Host-`), or 9 (`__Secure-`) bytes. Rules out almost
+/// every pair before any prefix detection.
+const fn could_shadow(len: usize, core: usize) -> bool {
+    len == core || len == core + 7 || len == core + 9
+}
+
 /// Steps 4 to 6 of the algorithm: split, then check the name and the value.
-fn classify<'a>(seg: &'a [u8], limits: &Limits) -> Option<Pair<'a>> {
+/// `text` is the whole line as `str` when it is valid UTF-8; the pair is then
+/// sliced out of it with no second check.
+fn classify<'a>(seg: &'a [u8], limits: &Limits, text: Option<&'a str>) -> Option<Pair<'a>> {
     let eq = find_byte(b'=', seg)?;
     let name = seg.get(..eq)?;
     let value = seg.get(eq + 1..)?;
@@ -796,6 +813,14 @@ fn classify<'a>(seg: &'a [u8], limits: &Limits) -> Option<Pair<'a>> {
     if !ok {
         return None;
     }
+    if let Some(text) = text {
+        // `seg` lies inside the line `text` was made from.
+        let at = (name.as_ptr() as usize).wrapping_sub(text.as_ptr() as usize);
+        let value_at = at + eq + 1;
+        if let (Some(n), Some(v)) = (text.get(at..at + eq), text.get(value_at..value_at + value.len())) {
+            return Some(Pair { name: n, value: v });
+        }
+    }
     Some(Pair {
         name: core::str::from_utf8(name).ok()?,
         value: core::str::from_utf8(value).ok()?,
@@ -803,14 +828,14 @@ fn classify<'a>(seg: &'a [u8], limits: &Limits) -> Option<Pair<'a>> {
 }
 
 /// Linear-time detection of repeated prefixed names (decision D-039): an
-/// open-addressed table of the first 64 distinct prefixed names, keyed by an
+/// open-addressed table of the first 16 distinct prefixed names, keyed by an
 /// FNV-1a hash, with an exact compare on a match. No allocation.
 struct DupTable<'a> {
     slots: [Option<&'a str>; DUP_SLOTS],
     used: usize,
 }
 
-const DUP_SLOTS: usize = 64;
+const DUP_SLOTS: usize = 16;
 
 impl<'a> DupTable<'a> {
     const fn new() -> Self {
@@ -845,7 +870,7 @@ impl<'a> DupTable<'a> {
                 None => return,
             }
         }
-        // Full: names past the first 64 distinct ones are not tracked.
+        // Full: names past the first 16 distinct ones are not tracked.
         debug_assert_eq!(self.used, DUP_SLOTS);
     }
 }
@@ -1168,8 +1193,8 @@ mod tests {
         let l = Limits::DEFAULT.max_pairs(1024);
         let s = Cookies::with_limits(&h, &l).unwrap().stats();
         assert_eq!(s.pairs, 200);
-        // the first 64 distinct names are tracked
-        assert_eq!(s.prefixed_duplicates, 64);
+        // the first 16 distinct names are tracked
+        assert_eq!(s.prefixed_duplicates, 16);
     }
 
     #[test]

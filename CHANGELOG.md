@@ -13,6 +13,36 @@
 
 ---
 
+## [0.6.0] - 2026-10-23
+
+Optimisation: measured against the best Rust crates, and made faster where
+it fell short.
+
+### Added
+
+- `docs/PERFORMANCE.md`: measured ratios against `cookie`, `biscotti`, and
+  `cookie_store` for every operation in the plan, the machine, the method
+  (alternating rounds timed with thread CPU time, because the shared machine
+  runs near full load), criterion results, and the plan for sealing.
+- `benches/cookies.rs`: criterion benchmarks of every hot path, the
+  regression baseline (feature `encrypted` and `jar`).
+- The comparison harness, the public repository cookie-net-bench.
+
+### Changed
+
+- Signing and verifying hash inputs of up to 512 bytes in one keyed BLAKE3
+  call from a stack buffer: sign 35% and verify 33% faster, the same bytes
+  (the format vectors are unchanged).
+- The `Cookie` scanner checks each line as UTF-8 once and slices names and
+  values from it: `get`, `get_unique`, `locate`, and iteration 24 to 33%
+  faster.
+- The prefixed-duplicate table has 16 slots instead of 64 (`Stats` tracks
+  the first 16 distinct prefixed names).
+- `dev/PLAN.md` decisions D-070 to D-074; the crypt-io request for
+  XAES-256-GCM.
+
+---
+
 ## [0.5.0] - 2026-10-23
 
 Feature complete: the client side and the cookie jar.
@@ -171,7 +201,8 @@ The scaffold and the plan. No functional code yet.
 - `dev/PLAN.md` (purpose, scope, architecture, threats, ecosystem, open
   decisions, decision log), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 
-[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/jamesgober/cookie-net/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/jamesgober/cookie-net/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jamesgober/cookie-net/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jamesgober/cookie-net/compare/v0.2.0...v0.3.0

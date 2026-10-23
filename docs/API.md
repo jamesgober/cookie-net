@@ -1,7 +1,7 @@
 # cookie-net - API Reference
 
 > Reference for every public item in `cookie-net`, with signatures, behaviour, the errors each item can return, and examples.
-> **Current release: `0.5.0` (feature complete).** This document, locked at `0.2.0`, is the contract for `0.3.0` to `1.0.0`. Each item carries the version that ships it; items marked with a later version than the current release are specified here and not yet in the crate. Names and signatures do not change after `0.2.0` without a decision-log entry in [`../dev/PLAN.md`](../dev/PLAN.md).
+> **Current release: `0.6.0` (optimisation).** This document, locked at `0.2.0`, is the contract for `0.3.0` to `1.0.0`. Each item carries the version that ships it; items marked with a later version than the current release are specified here and not yet in the crate. Names and signatures do not change after `0.2.0` without a decision-log entry in [`../dev/PLAN.md`](../dev/PLAN.md).
 
 <sub>Copyright &copy; 2026 <strong>James Gober</strong>.</sub>
 
@@ -103,7 +103,7 @@ Every item has an id (`REQ-3`), a **grade**, a **tier**, and the **version** tha
 | 2 | configuration and richer views for the next 15% of uses |
 | 3 | the full allocation-free surface, for other libraries and the WASP gateway |
 
-The convention in every example is `use cookie_net as cookie;`.
+The convention in every example is `use cookie_net as cookie;`. The **Cost** columns are the plan's targets, marked [est.]; measured numbers are in [`PERFORMANCE.md`](./PERFORMANCE.md).
 
 ### Inputs and outputs
 
@@ -684,7 +684,7 @@ pub struct Stats {
     pub skipped: u16,               // broke the grammar or a length limit (not empty pairs)
     pub empty: u16,                 // ";;" or a trailing ';'
     pub loose_separators: u16,      // ';' without one SP after it, or with more whitespace
-    pub prefixed_duplicates: u16,   // extra occurrences of `__Host-` or `__Secure-` names (first 64 distinct names tracked)
+    pub prefixed_duplicates: u16,   // extra occurrences of `__Host-` or `__Secure-` names (first 16 distinct names tracked)
     pub truncated: bool,            // stopped at `max_pairs`
     pub too_long: bool,             // over `max_header_len`: nothing was read
 }

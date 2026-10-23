@@ -3,7 +3,7 @@
 # =============================================================================
 [package]
 name    = "cookie-net"
-version = "0.5.0"
+version = "0.6.0"
 
 # Minimum Supported Rust Version (MSRV)
 rust-version = "1.85"
@@ -104,11 +104,21 @@ name = "04_client_jar"
 required-features = ["jar"]
 
 
+# BENCHMARKS (every hot path; the competitor comparison is cookie-net-bench)
+# #################################
+[[bench]]
+name = "cookies"
+harness = false
+required-features = ["encrypted", "jar"]
+
+
 # DEV DEPENDENCIES
 # #################################
 [dev-dependencies]
 # Property tests only; never a runtime dependency.
 proptest = { version = "1", default-features = false, features = ["std"] }
+# The regression baseline in benches/; never a runtime dependency.
+criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
 
 
 # RELEASE PROFILE

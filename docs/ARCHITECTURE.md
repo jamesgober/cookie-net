@@ -66,7 +66,7 @@ Every layer below the core is optional. The core is sans-IO: no clock reads (tim
 ```
 
 - `Cookies` is a 48-byte `Copy` view; each query re-scans, which is cheaper than storing spans for the usual handful of pairs [est.].
-- The prefixed-duplicate check uses a 64-slot open-addressed table on the stack (FNV-1a, exact compare), so detection is linear.
+- The prefixed-duplicate check uses a 16-slot open-addressed table on the stack (FNV-1a, exact compare), so detection is linear.
 - Names are compared byte for byte; shadow names compare ignoring ASCII case after removing a prefix.
 
 ## Writing `Set-Cookie`
@@ -103,7 +103,7 @@ There is one emitter; every output path and the length come from it, so they can
 
 | Part | Memory | Bounded by |
 |---|---|---|
-| reading | none; a 1 KiB stack table for `stats`, `scan`, `locate` | `Limits` |
+| reading | none; a 256-byte stack table for `stats`, `scan`, `locate` | `Limits` |
 | writing | none; `SetCookie` is 232 bytes on the stack | the 4096 and 1024 byte rules |
 | signing | none per call | the 4096-byte cookie limit |
 | sealing | the caller's scratch `Vec` (reused) and a 3 KiB stack buffer when opening | the 4096-byte cookie limit |

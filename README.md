@@ -77,16 +77,16 @@
 
 ```toml
 [dependencies]
-cookie-net = "0.5"
+cookie-net = "0.6"
 
 # signed and encrypted cookies:
-cookie-net = { version = "0.5", features = ["signed", "encrypted"] }
+cookie-net = { version = "0.6", features = ["signed", "encrypted"] }
 
 # an outbound client:
-cookie-net = { version = "0.5", features = ["jar"] }
+cookie-net = { version = "0.6", features = ["jar"] }
 
 # no_std, no allocator:
-cookie-net = { version = "0.5", default-features = false }
+cookie-net = { version = "0.6", default-features = false }
 ```
 
 | Feature | Default | Adds |
@@ -180,11 +180,27 @@ More in [`examples/`](./examples) and [`docs/API.md`](./docs/API.md).
 
 ---
 
-## Status: feature complete (`0.5.0`)
+## Performance
+
+Measured against `cookie`, `biscotti`, and `cookie_store` on the same bytes ([`docs/PERFORMANCE.md`](./docs/PERFORMANCE.md), harness in [cookie-net-bench](https://github.com/jamesgober/cookie-net-bench)):
+
+| Operation | cookie-net faster than the best competitor by |
+|---|---|
+| reading a credential (`get_unique`, `locate`) | 43 to 50% |
+| first match, iteration | 48 to 50% |
+| writing `Set-Cookie`, session cookies | 62 to 70% |
+| signing, verifying | 47%, 33% |
+| client `Set-Cookie` parsing | 36% |
+| jar `Cookie` header | 56% |
+| sealing, opening | about 4 times **slower** than AES-256-GCM: the cipher; XAES-256-GCM is planned |
+
+## Status: optimisation (`0.6.0`)
 
 **Done:** the request side, the response side, the session helpers (0.3); signed and encrypted cookies with key rings, staged rotation, fingerprints, expiry, and session binding (0.4); the client parser, the cookie-date algorithm, the cookie jar with a store trait and export, and `Clear-Site-Data` for cookie-bomb recovery (0.5). Each rule tested with its source; property, counting-allocator, complexity, and attack tests; test vectors; nine fuzz targets.
 
-**Next:** `0.6` benchmarks against `cookie`, `biscotti`, and `cookie_store`; `0.7` hardening. The schedule is in [`dev/ROADMAP.md`](./dev/ROADMAP.md).
+**0.6:** measured against `cookie`, `biscotti`, and `cookie_store`; signing, verifying, and reading made 24 to 35% faster with the same output.
+
+**Next:** `0.7` hardening: 24-hour fuzzing of every target, the remaining attack tests, a jar soak, `docs/SECURITY.md`. The schedule is in [`dev/ROADMAP.md`](./dev/ROADMAP.md).
 
 **API stability:** the API was locked at `0.2.0`; names change only with a recorded decision in [`dev/PLAN.md`](./dev/PLAN.md). Performance numbers are targets until `0.6` measures them.
 
@@ -204,6 +220,7 @@ More in [`examples/`](./examples) and [`docs/API.md`](./docs/API.md).
 - **[Which cookie, when](./docs/COOKIES.md)** - session tokens, signed and sealed state, `SameSite`, the rotation runbook
 - **[Formats](./docs/FORMATS.md)** - the byte-exact signed, sealed, and jar export formats, with test vectors
 - **[Architecture](./docs/ARCHITECTURE.md)** - modules, data flow, memory, and bounds
+- **[Performance](./docs/PERFORMANCE.md)** - measured numbers, method, and the sealing plan
 - **[Plan](./dev/PLAN.md)** - design, threats, decisions
 - **[Roadmap](./dev/ROADMAP.md)** - versions and exit criteria
 - **[docs.rs](https://docs.rs/cookie-net)** - rustdoc
