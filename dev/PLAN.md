@@ -4,7 +4,7 @@
 >
 > **Read order:** [`../REPS.md`](../REPS.md) &rarr; [`DIRECTIVES.md`](./DIRECTIVES.md) &rarr; **this file** &rarr; [`ROADMAP.md`](./ROADMAP.md) &rarr; [`../docs/API.md`](../docs/API.md) (the locked API).
 >
-> **Status:** `0.2.0`, design lock. Rewritten from the crate's specification on 2026-10-23 (decision D-004). The public API is in `docs/API.md`; this file holds the reasons.
+> **Status:** `0.2.0`, design lock, API approved by James on 2026-10-23. Rewritten from the crate's specification (decision D-004). The public API is in `docs/API.md`; this file holds the reasons.
 
 ---
 
@@ -349,7 +349,7 @@ At least one new defence idea per version, as hypothesis, method, and expected c
 
 | Id | Question | Outcome |
 |---|---|---|
-| CN-1 | Publish 0.1.0 now to claim the name? | **open, for James** (irreversible, public): the name is not on crates.io (checked 2026-10-22). Recommendation: yes, with the 0.2.0 design-lock release following on the same day |
+| CN-1 | Publish 0.1.0 now to claim the name? | published 2026-10-23, decided by James (D-043) |
 | CN-2 | Signed-cookie MAC | keyed BLAKE3, 128-bit tag (D-005) |
 | CN-3 | AEAD | XChaCha20-Poly1305 (D-006) |
 | CN-4 | base64url before encode-lib | private module copied from csrf-sec, removal recorded (D-008) |
@@ -421,3 +421,5 @@ At least one new defence idea per version, as hypothesis, method, and expected c
 | D-040 | 2026-10-23 | `locate` returns `Located { lookup, shadows, stats }` (the specification returned `Lookup`), with `severity_hint`; `Stats` gains `too_long` | one pass gives the gateway every fact it scores; shadow names are the 0.3 defence idea |
 | D-041 | 2026-10-23 | `Limits` and `JarLimits` setters are `const` and clamp to their documented ranges | `const` configuration cannot fail; the getters show what is in force |
 | D-042 | 2026-10-23 | `Signer::new`, `Sealer::new`, and `with_ring` refuse a key whose 32 bytes are all equal (`WeakKey`) | catches an unset or zeroed key at boot, as csrf-sec does |
+| D-043 | 2026-10-23 | 0.1.0 published from the scaffold commit before 0.2.0 (CN-1, decided by James); the API in `docs/API.md` approved by James the same day | claims the name; every version ships through the release routine |
+| D-044 | 2026-10-23 | The 0.2 exit item "gate-net and the WASP gates confirm the session helpers" moves to 0.8 | neither consumer has code yet; the helpers follow gate-net's written design and the X-6 decision, and 0.8 is where the gates are built on cookie-net |

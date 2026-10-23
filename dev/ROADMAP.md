@@ -18,19 +18,19 @@
 
 - [x] Manifest, README, CHANGELOG, REPS, dual license, CI, deny, clippy, rustfmt, DIRECTIVES, ROADMAP, PLAN.
 - [x] Session cookie section merged (PR #1, 2026-10-23).
-- [ ] Publish 0.1.0 to claim the name: waiting for James (PLAN CN-1).
+- [x] Published 0.1.0 to claim the name (2026-10-23, PLAN CN-1, D-043).
 
-Exit: CI green on every platform (done).
+Exit: crate on crates.io; CI green on every platform (done).
 
 ## v0.2.0 - Design lock
 
 - [x] `docs/API.md`: every public item with signature, behaviour, errors, grade, tier, version, cost, and examples.
 - [x] `dev/PLAN.md` rewritten from the specification; its differences recorded as decisions (D-004 to D-042).
-- [x] Open decisions CN-2 to CN-11 closed; CN-1 brought to James.
-- [ ] James approves the API.
-- [ ] gate-net and the WASP gates confirm the session helpers match gate-net's session design (requests recorded in PLAN 13.2).
+- [x] Open decisions CN-1 to CN-11 closed (CN-1 by James).
+- [x] James approved the API (2026-10-23).
+- [ ] gate-net and the WASP gates confirm the session helpers match gate-net's session design (requests recorded in PLAN 13.2). **Moved to 0.8 (alpha)**, where the WASP gates are built on cookie-net: neither has code yet, and the helpers follow gate-net's written design and James's X-6 decision.
 
-Exit: the API is approved. Then the release routine for 0.2.0 (no code beyond `VERSION`).
+Exit: the API is approved (done). Then the release routine for 0.2.0 (no code beyond `VERSION`).
 
 ## v0.3.0 - Plain cookies (request side, response side, sessions)
 
@@ -76,6 +76,7 @@ Exit: no open finding; every threat proven by a test.
 
 ## v0.8.0 - Alpha
 
+- [ ] gate-net and the WASP gate owners confirm the session helpers (moved from 0.2).
 - [ ] The WASP gateway credential locator and the gates (login, logout, elevation, rolling tokens) built on cookie-net in a local build; web-net preferences and flash messages on `Signer` and `Sealer`.
 
 Exit: the end-to-end WASP login flow is green with cookie-net; csrf-sec's expectations of the session cookie verified.
