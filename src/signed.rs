@@ -51,6 +51,7 @@ pub(crate) const MAX_SKEW: u64 = 3_600;
 /// ```
 /// use cookie_net::{Rejected, Signer};
 ///
+/// # #[cfg(feature = "alloc")] {
 /// let signer = Signer::new(*b"an example key, 32 bytes long!!!")?;
 /// let now = 1_800_000_000;
 /// let value = signer.sign("prefs", "lang=fr")?;
@@ -58,6 +59,7 @@ pub(crate) const MAX_SKEW: u64 = 3_600;
 /// assert!(value.ends_with("lang=fr"));
 /// assert_eq!(signer.verify("prefs", &value, now)?, "lang=fr");
 /// assert_eq!(signer.verify("theme", &value, now), Err(Rejected::BadTag));   // moved to another name
+/// # }
 /// # Ok::<(), cookie_net::CookieError>(())
 /// ```
 pub struct Signer {
@@ -116,9 +118,11 @@ impl Signer {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")] {
     /// let s = cookie_net::Signer::new(*b"an example key, 32 bytes long!!!")?.with_skew(0);
     /// let v = s.sign_until("a", "1", 1_800_000_000)?;
     /// assert!(s.verify("a", &v, 1_800_000_000).is_err());
+    /// # }
     /// # Ok::<(), cookie_net::CookieError>(())
     /// ```
     #[must_use]
@@ -138,8 +142,10 @@ impl Signer {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")] {
     /// let s = cookie_net::Signer::new(*b"an example key, 32 bytes long!!!")?;
     /// assert!(s.sign("prefs", "lang=fr")?.ends_with("lang=fr"));
+    /// # }
     /// # Ok::<(), cookie_net::CookieError>(())
     /// ```
     #[cfg(feature = "alloc")]
@@ -161,10 +167,12 @@ impl Signer {
     /// ```
     /// use cookie_net::{Rejected, Signer};
     ///
+    /// # #[cfg(feature = "alloc")] {
     /// let s = Signer::new(*b"an example key, 32 bytes long!!!")?;
     /// let v = s.sign_until("notice", "seen", 1_800_000_000)?;
     /// assert_eq!(s.verify("notice", &v, 1_799_999_999)?, "seen");
     /// assert_eq!(s.verify("notice", &v, 1_800_000_060), Err(Rejected::Expired));
+    /// # }
     /// # Ok::<(), cookie_net::CookieError>(())
     /// ```
     #[cfg(feature = "alloc")]
@@ -192,10 +200,12 @@ impl Signer {
     /// ```
     /// use cookie_net::{Rejected, Signer};
     ///
+    /// # #[cfg(feature = "alloc")] {
     /// let s = Signer::new(*b"an example key, 32 bytes long!!!")?;
     /// let v = s.sign_bound("cart", "c-81731", b"session one")?;
     /// assert_eq!(s.verify_bound("cart", &v, b"session one", 0)?, "c-81731");
     /// assert_eq!(s.verify_bound("cart", &v, b"session two", 0), Err(Rejected::BadTag));
+    /// # }
     /// # Ok::<(), cookie_net::CookieError>(())
     /// ```
     #[cfg(feature = "alloc")]
@@ -311,10 +321,12 @@ impl Signer {
     /// ```
     /// use cookie_net::{Rejected, Signer};
     ///
+    /// # #[cfg(feature = "alloc")] {
     /// let s = Signer::new(*b"an example key, 32 bytes long!!!")?;
     /// let v = s.sign("prefs", "lang=fr")?;
     /// assert_eq!(s.verify("prefs", &v, 0)?, "lang=fr");
     /// assert_eq!(s.verify("prefs", "short", 0), Err(Rejected::Malformed));
+    /// # }
     /// # Ok::<(), cookie_net::CookieError>(())
     /// ```
     pub fn verify<'a, R: AsRef<[u8]> + ?Sized>(
@@ -335,9 +347,11 @@ impl Signer {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")] {
     /// let s = cookie_net::Signer::new(*b"an example key, 32 bytes long!!!")?;
     /// let v = s.sign_bound("cart", "c-1", b"sid-digest")?;
     /// assert_eq!(s.verify_bound("cart", &v, b"sid-digest", 0)?, "c-1");
+    /// # }
     /// # Ok::<(), cookie_net::CookieError>(())
     /// ```
     pub fn verify_bound<'a, R: AsRef<[u8]> + ?Sized>(
@@ -363,10 +377,12 @@ impl Signer {
     /// ```
     /// use cookie_net::{KeyId, KeyRole, Signer};
     ///
+    /// # #[cfg(feature = "alloc")] {
     /// let s = Signer::new(*b"an example key, 32 bytes long!!!")?;
     /// let v = s.sign_until("prefs", "x", 1_800_000_000)?;
     /// let got = s.verify_detailed("prefs", &v, &[], 1_700_000_000)?;
     /// assert_eq!((got.value, got.key, got.role, got.expires), ("x", KeyId(0), KeyRole::Signing, Some(1_800_000_000)));
+    /// # }
     /// # Ok::<(), cookie_net::CookieError>(())
     /// ```
     pub fn verify_detailed<'a, R: AsRef<[u8]> + ?Sized>(
@@ -425,9 +441,11 @@ impl Signer {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(feature = "alloc")] {
     /// let s = cookie_net::Signer::new(*b"an example key, 32 bytes long!!!")?;
     /// let v = s.sign("prefs", "x")?;
     /// assert_eq!(s.verify_now("prefs", &v)?, "x");
+    /// # }
     /// # Ok::<(), cookie_net::CookieError>(())
     /// ```
     #[cfg(feature = "std")]
