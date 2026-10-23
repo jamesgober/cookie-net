@@ -55,16 +55,17 @@ Exit: every single-bit change of a signed or sealed value is refused; a value ne
 
 ## v0.5.0 - Feature complete (client side, defence helpers)
 
-- [ ] CLI-1 to CLI-4: `parse_set_cookie`, `SetCookieView`, `SameSiteAttr`, `cookie_date`.
-- [ ] JAR-1 to JAR-10, JAR-12: `Jar`, `RequestUrl`, `RequestContext`, `PublicSuffix`, `NoSuffixList`, `JarLimits`, `StoreOutcome`, `IgnoreReason`, partitioned storage, `JarStore` and `MemoryStore`, export and import.
-- [ ] SES-4: `CLEAR_SITE_DATA_COOKIES`.
-- [ ] `docs/ARCHITECTURE.md`.
+- [x] CLI-1 to CLI-4: `parse_set_cookie`, `SetCookieView`, `SameSiteAttr`, `cookie_date`.
+- [x] JAR-1 to JAR-10, JAR-12, JAR-13: `Jar`, `RequestUrl`, `RequestContext`, `PublicSuffix`, `NoSuffixList`, `JarLimits`, `StoreOutcome`, `IgnoreReason`, partitioned storage, `JarStore` and `MemoryStore`, export and import, `with_store` and `cookies`.
+- [x] SES-4: `CLEAR_SITE_DATA_COOKIES`.
+- [x] `docs/ARCHITECTURE.md`.
 
-Exit: every P0, P1, P2 item exists with doctests; web-platform-tests-derived cases pass for the client parser and the jar; fuzz targets `parse_set_cookie`, `cookie_date`, `jar_ops` run one hour clean.
+Exit: every P0, P1, P2 item exists with doctests; web-platform-tests-derived cases pass for the client parser and the jar; fuzz targets `parse_set_cookie`, `cookie_date`, `jar_ops` run one hour clean. **Met 2026-10-23.**
 
 ## v0.6.0 - Optimisation
 
 - [ ] criterion benchmarks against `cookie`, `biscotti`, and `cookie_store` for every row of PLAN section 10, in a separate comparison repository (competitors never enter this crate's dependency tree); `docs/PERFORMANCE.md` with method and hardware.
+- [ ] Decide the jar's per-domain index from the `cookie_store` comparison (PLAN D-067).
 
 Exit: each comparable row is at least 20% faster than the best competitor, or has a recorded plan; no regression over 5%.
 

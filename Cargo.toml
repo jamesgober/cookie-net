@@ -3,7 +3,7 @@
 # =============================================================================
 [package]
 name    = "cookie-net"
-version = "0.4.0"
+version = "0.5.0"
 
 # Minimum Supported Rust Version (MSRV)
 rust-version = "1.85"
@@ -63,11 +63,13 @@ signed = ["dep:crypt-io", "crypt-io/mac-blake3", "crypt-io/kdf-hkdf", "crypt-io/
 # through crypt-io, which needs the OS random source, so it implies `std`.
 encrypted = ["signed", "std", "crypt-io/aead-chacha20", "crypt-io/std"]
 
-# Client side: `parse_set_cookie`, `cookie_date` (0.5).
+# Client side: `parse_set_cookie`, `cookie_date`, `SetCookieView`. No
+# allocator needed.
 client = []
 
-# The client cookie jar (0.5).
-jar = ["client", "alloc"]
+# The client cookie jar. Its export format carries a BLAKE3 checksum through
+# crypt-io (hashing only).
+jar = ["client", "alloc", "dep:crypt-io", "crypt-io/hash-blake3"]
 
 
 # DEPENDENCIES
@@ -96,6 +98,10 @@ required-features = ["alloc"]
 [[example]]
 name = "03_signed_and_sealed"
 required-features = ["encrypted"]
+
+[[example]]
+name = "04_client_jar"
+required-features = ["jar"]
 
 
 # DEV DEPENDENCIES
