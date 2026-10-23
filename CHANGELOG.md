@@ -11,6 +11,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `dev/PLAN.md` section 4a: the session cookies (`__Host-sid`, `__Host-sudo`,
+  CSRF) and why session tokens are opaque rather than signed or encrypted.
+
 ---
 
 ## [0.1.0] - 2026-10-13

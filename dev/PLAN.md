@@ -48,6 +48,18 @@ Rules enforced at build time, not hoped for:
 
 Keys come from key-vault and are zeroized after use. Encodings use base64url (the encodings crate, planned).
 
+## 4a. The session cookies (with gate-net)
+
+Session security is designed in `gate-net/dev/SESSIONS.md`; cookie-net carries the tokens:
+
+| Cookie | Attributes | Content |
+|---|---|---|
+| `__Host-sid` | `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`, no `Domain` | 32 random bytes, base64url; a lookup key only, never trusted |
+| `__Host-sudo` (elevated sub-session) | as above, `SameSite=Strict`, short `Max-Age` (5 to 15 min) | a separate random token for sensitive actions |
+| CSRF token | readable by the page where the form needs it | random, bound to the session on the server |
+
+Session tokens are opaque random values, so they are **not** signed or encrypted cookies: there is nothing in them to protect, and the server record is the truth. Signed and encrypted cookies (section 4) are for small non-session state (preferences, flash messages). Cost of reading a session cookie: about 10 ns (zero-copy parse).
+
 ## 5. Threats
 
 | Threat | Defence |
