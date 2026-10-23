@@ -11,6 +11,29 @@
 
 ## [Unreleased]
 
+### Added
+
+- `docs/SECURITY.md`: the threat model T1 to T30, with each defence, its
+  cost, and the test that proves it; what cookie-net does not defend; the
+  hardening evidence; operating guidance.
+- `docs/PLATFORM-NOTES.md`: what each feature needs from the platform, the
+  platforms CI proves, the clock, the random source, constant-time code, and
+  byte order.
+- Attack tests for T14 to T30 (`tests/threats_crypto_client.rs`).
+- A jar soak (`tests/soak.rs`, ignored, Linux): random `Set-Cookie` streams
+  for 500 hosts with export and import, checking that resident memory stays
+  flat.
+
+### Changed
+
+- `verify_now` and `open_now` treat a system clock before 2020-01-01 as the
+  far future, so expiring values and retired keys are refused. A clock
+  before 1970 used to read as 0, which accepted them.
+- Clippy denies `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`,
+  `unreachable!`, `dbg!`, and print macros in library code; the two
+  remaining debug assertions are gone, so fuzz and release builds run the
+  same code.
+
 ---
 
 ## [0.6.0] - 2026-10-23

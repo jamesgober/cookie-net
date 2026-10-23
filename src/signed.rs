@@ -434,6 +434,11 @@ impl Signer {
 
     /// [`verify`](Self::verify) with the system clock.
     ///
+    /// A clock that reads before 2020-01-01 (the epoch of the expiry
+    /// encoding) is treated as the far future: values with an expiry and
+    /// retired keys are refused, not accepted. Values without an expiry are
+    /// unaffected.
+    ///
     /// # Errors
     ///
     /// A [`Rejected`] reason.

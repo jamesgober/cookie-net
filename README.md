@@ -221,6 +221,8 @@ Measured against `cookie`, `biscotti`, and `cookie_store` on the same bytes ([`d
 - **[Formats](./docs/FORMATS.md)** - the byte-exact signed, sealed, and jar export formats, with test vectors
 - **[Architecture](./docs/ARCHITECTURE.md)** - modules, data flow, memory, and bounds
 - **[Performance](./docs/PERFORMANCE.md)** - measured numbers, method, and the sealing plan
+- **[Security](./docs/SECURITY.md)** - the threat model, each defence, its cost, and the test that proves it
+- **[Platform notes](./docs/PLATFORM-NOTES.md)** - what each feature needs, the clock, the random source, constant-time code
 - **[Plan](./dev/PLAN.md)** - design, threats, decisions
 - **[Roadmap](./dev/ROADMAP.md)** - versions and exit criteria
 - **[docs.rs](https://docs.rs/cookie-net)** - rustdoc
