@@ -14,6 +14,25 @@ use crate::{
     response::{SameSite, SetCookie},
 };
 
+/// The value of a `Clear-Site-Data` response header that tells the browser
+/// to drop every cookie for the site (W3C Clear Site Data). It is the
+/// recovery for cookie bombing: when the credential lookup reports
+/// `Truncated` or `HeaderTooLong`, answer with this header and the user can
+/// sign in again; the server-side session is not affected. The caller
+/// decides when to send it.
+///
+/// # Examples
+///
+/// ```
+/// use cookie_net::{self as cookie, Ambiguous};
+///
+/// let bombed = "x=".to_string() + &"y".repeat(9000);
+/// if let Err(Ambiguous::Truncated | Ambiguous::HeaderTooLong) = cookie::get_unique(&bombed, "__Host-sid") {
+///     assert_eq!(cookie::CLEAR_SITE_DATA_COOKIES, "\"cookies\"");
+/// }
+/// ```
+pub const CLEAR_SITE_DATA_COOKIES: &str = "\"cookies\"";
+
 /// The shortest session token accepted: 22 base64url characters are 128 bits.
 const MIN_TOKEN: usize = 22;
 /// The elevated cookie's lifetime bounds, in seconds.

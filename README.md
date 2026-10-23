@@ -32,7 +32,7 @@
 </p>
 
 <p>
-    Signed cookies (keyed BLAKE3) and encrypted cookies (XChaCha20-Poly1305), both through crypt-io, carry small client-held state: the cookie name is bound into the MAC, an optional expiry is enforced by the server, an optional binding ties a value to one session, and key rings rotate in stages so no node of a cluster refuses a cookie another node just made. A client-side <code>Set-Cookie</code> parser and cookie jar arrive in <code>0.5</code>. The whole API, with the version of each item, is in <a href="./docs/API.md"><code>docs/API.md</code></a>.
+    Signed cookies (keyed BLAKE3) and encrypted cookies (XChaCha20-Poly1305), both through crypt-io, carry small client-held state: the cookie name is bound into the MAC, an optional expiry is enforced by the server, an optional binding ties a value to one session, and key rings rotate in stages so no node of a cluster refuses a cookie another node just made. For outbound clients there is a <code>Set-Cookie</code> parser that follows the user-agent algorithm and a bounded cookie jar that fails closed on domain cookies without a public suffix list. The whole API, with the version of each item, is in <a href="./docs/API.md"><code>docs/API.md</code></a>.
 </p>
 
 ---
@@ -59,6 +59,12 @@
 - **Key rings for clusters** - one signing key and up to seven others, staged rotation (`accept`, switch, drop), fingerprints to compare rings across nodes, per-purpose subkeys from one master.
 - **Precise refusals** - `Rejected` says why (`Malformed`, `UnsupportedVersion`, `UnknownKey`, `BadTag`, `Expired`) with a stable code and a severity hint; tags compared in constant time.
 
+### **Client side** (features `client`, `jar`)
+- **User-agent parsing** - `parse_set_cookie` and `cookie_date` follow rfc6265bis sections 5.6 and 5.1.1, so a client sees cookies as a browser does.
+- **A jar that refuses supercookies** - without a public suffix list, a `Domain` other than the host is refused; `Secure` cookies cannot be shadowed from plain HTTP; nameless cookies cannot plant a prefixed name.
+- **Bounded and portable** - per-domain and total limits with expired-first then least-recently-used eviction; state behind a `JarStore` trait; export and import with a checksum, validated as untrusted input.
+- **`SameSite` and partitions** - a request context for cross-site navigations, and partitioned cookies kept to their top-level site.
+
 ### **Reliability and safety**
 - **No unsafe code** - `#![forbid(unsafe_code)]`.
 - **No panics** - every fallible call returns `Result`; fuzzed, property-tested, and covered by one attack test per threat.
@@ -71,13 +77,16 @@
 
 ```toml
 [dependencies]
-cookie-net = "0.4"
+cookie-net = "0.5"
 
 # signed and encrypted cookies:
-cookie-net = { version = "0.4", features = ["signed", "encrypted"] }
+cookie-net = { version = "0.5", features = ["signed", "encrypted"] }
+
+# an outbound client:
+cookie-net = { version = "0.5", features = ["jar"] }
 
 # no_std, no allocator:
-cookie-net = { version = "0.4", default-features = false }
+cookie-net = { version = "0.5", default-features = false }
 ```
 
 | Feature | Default | Adds |
@@ -86,7 +95,8 @@ cookie-net = { version = "0.4", default-features = false }
 | `alloc` | through `std` | `SetCookie::encode`, `String`-returning signing |
 | `signed` | no | `Key`, `KeyRing`, `Signer` (crypt-io; works without `std` given an allocator) |
 | `encrypted` | no | `Sealer`; implies `signed` and `std` |
-| `client`, `jar` | no | declared; their code arrives in 0.5 |
+| `client` | no | `parse_set_cookie`, `cookie_date` (no allocator needed) |
+| `jar` | no | `Jar` and its types; implies `client` and `alloc` |
 
 ---
 
@@ -144,6 +154,17 @@ let flash = sealer.seal_until("flash", "Payment received.", now + 60)?;
 assert_eq!(sealer.open("flash", &flash, now)?.as_str(), Some("Payment received."));
 ```
 
+### **An outbound client**
+
+```rust
+use cookie_net::{Jar, RequestUrl};
+
+let mut jar = Jar::new();
+let url = RequestUrl::https("api.example.com", "/oauth/token");
+jar.store(&url, "sid=abc; Path=/; Secure; HttpOnly", now);
+let header = jar.cookie_header(&RequestUrl::https("api.example.com", "/v1/orders"), now);   // Some("sid=abc")
+```
+
 ### **Rules that cannot be broken**
 
 ```rust
@@ -159,11 +180,11 @@ More in [`examples/`](./examples) and [`docs/API.md`](./docs/API.md).
 
 ---
 
-## Status: signed and encrypted (`0.4.0`)
+## Status: feature complete (`0.5.0`)
 
-**Done:** the request side, the response side, the session helpers (0.3), and signed and encrypted cookies with key rings, staged rotation, fingerprints, expiry, and session binding (0.4); each rule tested with its source, property, counting-allocator, complexity, and attack tests, test vectors for both formats, and six fuzz targets.
+**Done:** the request side, the response side, the session helpers (0.3); signed and encrypted cookies with key rings, staged rotation, fingerprints, expiry, and session binding (0.4); the client parser, the cookie-date algorithm, the cookie jar with a store trait and export, and `Clear-Site-Data` for cookie-bomb recovery (0.5). Each rule tested with its source; property, counting-allocator, complexity, and attack tests; test vectors; nine fuzz targets.
 
-**Next:** `0.5` the client side and the cookie jar; `0.6` benchmarks against `cookie`, `biscotti`, and `cookie_store`; `0.7` hardening. The schedule is in [`dev/ROADMAP.md`](./dev/ROADMAP.md).
+**Next:** `0.6` benchmarks against `cookie`, `biscotti`, and `cookie_store`; `0.7` hardening. The schedule is in [`dev/ROADMAP.md`](./dev/ROADMAP.md).
 
 **API stability:** the API was locked at `0.2.0`; names change only with a recorded decision in [`dev/PLAN.md`](./dev/PLAN.md). Performance numbers are targets until `0.6` measures them.
 
@@ -181,7 +202,8 @@ More in [`examples/`](./examples) and [`docs/API.md`](./docs/API.md).
 
 - **[API Reference](./docs/API.md)** - every public item, its version, errors, and examples
 - **[Which cookie, when](./docs/COOKIES.md)** - session tokens, signed and sealed state, `SameSite`, the rotation runbook
-- **[Formats](./docs/FORMATS.md)** - the byte-exact signed and sealed formats, with test vectors
+- **[Formats](./docs/FORMATS.md)** - the byte-exact signed, sealed, and jar export formats, with test vectors
+- **[Architecture](./docs/ARCHITECTURE.md)** - modules, data flow, memory, and bounds
 - **[Plan](./dev/PLAN.md)** - design, threats, decisions
 - **[Roadmap](./dev/ROADMAP.md)** - versions and exit criteria
 - **[docs.rs](https://docs.rs/cookie-net)** - rustdoc

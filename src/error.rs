@@ -110,6 +110,9 @@ pub enum CookieError {
     /// crypt-io reported a failure, such as the OS random source failing while
     /// sealing. Nothing was written (fail closed).
     Crypto,
+    /// `Jar::import` got bytes with a wrong magic, version, checksum, length,
+    /// or field. Nothing was imported.
+    InvalidJarData,
     /// A unique lookup could not give one answer (through `?` only).
     Ambiguous(Ambiguous),
     /// A signed or sealed cookie did not verify (through `?` only).
@@ -157,6 +160,7 @@ impl CookieError {
             Self::RingFull => "ring_full",
             Self::InvalidRetireTime => "invalid_retire_time",
             Self::Crypto => "crypto",
+            Self::InvalidJarData => "invalid_jar_data",
             Self::Rejected(Rejected::Malformed) => "rejected.malformed",
             Self::Rejected(Rejected::UnsupportedVersion) => "rejected.unsupported_version",
             Self::Rejected(Rejected::UnknownKey) => "rejected.unknown_key",
@@ -234,6 +238,7 @@ impl fmt::Display for CookieError {
             Self::RingFull => f.write_str("key ring holds more than 8 keys or no signing key"),
             Self::InvalidRetireTime => f.write_str("retire time is after 2156"),
             Self::Crypto => f.write_str("cryptographic operation failed"),
+            Self::InvalidJarData => f.write_str("cookie jar data is not a valid export"),
             Self::Ambiguous(a) => fmt::Display::fmt(&a, f),
             Self::Rejected(r) => fmt::Display::fmt(&r, f),
         }
@@ -420,7 +425,7 @@ mod tests {
 
     use super::*;
 
-    const ALL: [CookieError; 34] = [
+    const ALL: [CookieError; 35] = [
         CookieError::EmptyName,
         CookieError::InvalidName { at: 1 },
         CookieError::InvalidValue { at: 2 },
@@ -447,6 +452,7 @@ mod tests {
         CookieError::RingFull,
         CookieError::InvalidRetireTime,
         CookieError::Crypto,
+        CookieError::InvalidJarData,
         CookieError::Rejected(Rejected::Malformed),
         CookieError::Rejected(Rejected::UnsupportedVersion),
         CookieError::Rejected(Rejected::UnknownKey),

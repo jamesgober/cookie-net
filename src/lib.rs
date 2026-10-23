@@ -59,8 +59,9 @@
 //! signing functions. `signed` adds keys and `Signer` (keyed BLAKE3, through
 //! crypt-io; it works without `std` but needs an allocator, because crypt-io
 //! links `alloc`). `encrypted` adds `Sealer` (XChaCha20-Poly1305; needs `std`
-//! for the OS random source). Without default features the core is `no_std`
-//! and needs no allocator.
+//! for the OS random source). `client` adds `parse_set_cookie` and
+//! `cookie_date` for outbound clients; `jar` adds a bounded cookie jar.
+//! Without default features the core is `no_std` and needs no allocator.
 
 #![doc(html_root_url = "https://docs.rs/cookie-net")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -75,6 +76,8 @@ extern crate std;
 
 #[cfg(feature = "signed")]
 mod b64;
+#[cfg(feature = "client")]
+mod client;
 mod error;
 #[cfg(feature = "signed")]
 mod keys;
@@ -88,6 +91,18 @@ mod session;
 #[cfg(feature = "signed")]
 mod signed;
 
+#[cfg(feature = "jar")]
+#[cfg_attr(docsrs, doc(cfg(feature = "jar")))]
+pub use client::jar::{
+    IgnoreReason, Jar, JarLimits, JarStore, MemoryStore, NoSuffixList, PublicSuffix,
+    RequestContext, RequestUrl, StoreOutcome, StoredCookie,
+};
+#[cfg(feature = "client")]
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
+pub use client::{
+    date::cookie_date,
+    set_cookie::{SameSiteAttr, SetCookieView, parse_set_cookie},
+};
 pub use error::{Ambiguous, CookieError, Rejected};
 #[cfg(feature = "signed")]
 #[cfg_attr(docsrs, doc(cfg(feature = "signed")))]
@@ -99,7 +114,7 @@ pub use response::{SameSite, SetCookie, SetCookieBuilder};
 #[cfg(feature = "encrypted")]
 #[cfg_attr(docsrs, doc(cfg(feature = "encrypted")))]
 pub use sealed::{Opened, Plaintext, Sealer};
-pub use session::{elevated_cookie, session_cookie};
+pub use session::{CLEAR_SITE_DATA_COOKIES, elevated_cookie, session_cookie};
 #[cfg(feature = "signed")]
 #[cfg_attr(docsrs, doc(cfg(feature = "signed")))]
 pub use signed::{Signer, Verified};

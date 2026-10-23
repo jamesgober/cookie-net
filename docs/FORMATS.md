@@ -12,6 +12,7 @@
 - [Sealed format v1](#sealed-format-v1)
 - [Verification order](#verification-order)
 - [Test vectors](#test-vectors)
+- [Jar export format v1](#jar-export-format-v1)
 
 ## Conventions
 
@@ -95,3 +96,21 @@ Sealed values carry a random nonce, so each sealing gives a new value; these two
 |---|---|
 | no expiry | `AgAAAAAAzGjJwQDAVhz2jWtZvKYe-3dsf_AHgYGeiTeQ0Hhrq4PMphuNs2yOW4JW3vGsMA` |
 | expires 1,800,000,000 | `AgANPfEA4tMKDOdxtSjBrgzj-FcQeXwwoTaN4xLq31PS2OBrq2b1HdbSZe2J3u-wl0PQ2g` |
+
+## Jar export format v1
+
+`Jar::export` and `Jar::import` (feature `jar`). Integers are big-endian.
+
+```
+export   = "CNJR" || 0x01 || u32be(count) || record * count || BLAKE3-256(everything before it)
+record   = flags (1) || same-site (1) || expiry (8) || creation (8) || last-access (8)
+           || u16be(len name) || name || u16be(len value) || value
+           || u16be(len domain) || domain || u16be(len path) || path
+           || u16be(len partition) || partition
+flags    = bit 0 host-only | bit 1 secure | bit 2 http-only | bit 3 has expiry | bit 4 partitioned
+same-site = 0 default | 1 Strict | 2 Lax | 3 None
+```
+
+- Records are in creation order, so an import sends cookies in the same order.
+- The checksum detects corruption; it is not a MAC. `import` checks every field as untrusted input: magic, version, count (at most 1,000,000), lengths, name plus value at most 4096 bytes, no control bytes or `;` in name, value, and path, a path starting with `/`, a lowercase ASCII domain and partition, the partitioned flag matching a partition key, and no bytes left over. Any failure imports nothing (`InvalidJarData`).
+- The bytes hold cookie values, which may be session tokens: store them as secrets.

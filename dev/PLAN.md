@@ -4,7 +4,7 @@
 >
 > **Read order:** [`../REPS.md`](../REPS.md) &rarr; [`DIRECTIVES.md`](./DIRECTIVES.md) &rarr; **this file** &rarr; [`ROADMAP.md`](./ROADMAP.md) &rarr; [`../docs/API.md`](../docs/API.md) (the locked API).
 >
-> **Status:** `0.4.0`, signed and encrypted cookies. API approved by James on 2026-10-23 at `0.2.0`. Rewritten from the crate's specification (decision D-004). The public API is in `docs/API.md`; this file holds the reasons.
+> **Status:** `0.5.0`, feature complete. API approved by James on 2026-10-23 at `0.2.0`. Rewritten from the crate's specification (decision D-004). The public API is in `docs/API.md`; this file holds the reasons.
 
 ---
 
@@ -439,3 +439,12 @@ At least one new defence idea per version, as hypothesis, method, and expected c
 | D-058 | 2026-10-23 | When a sealed value authenticates but has expired, the plaintext already written to the caller's buffer is wiped (dropped through `Zeroizing`) before `Expired` is returned | the tag is checked before the expiry (so a forgery reports `BadTag`), which means decryption has happened; the buffer's capacity is lost only on this rare path |
 | D-059 | 2026-10-23 | `Signer` and `Sealer` validate the cookie name (a non-empty token of at most 4096 bytes) when signing or sealing | a value signed for a name no cookie can have is a caller bug; the MAC input's u16 length prefix also needs the bound |
 | D-060 | 2026-10-23 | CI builds `signed` for `thumbv7em-none-eabi` with no default features | NFR-6: signing works without `std`; linking needs an allocator, which a bare-metal application provides |
+| D-061 | 2026-10-23 | `JarStore` is index-based: `len`, `get`, `get_mut`, `push`, `swap_remove`, `clear` (plus a default `is_empty`) | the jar applies every rule and bound itself, so a store only holds and indexes and cannot weaken them; a durable or shared store writes through on `push` and `swap_remove`; the shape fits a `Vec` with no overhead |
+| D-062 | 2026-10-23 | `NoSuffixList` reports every domain as a public suffix | the fail-closed behaviour (a `Domain` equal to the host becomes host-only, any other is refused) then falls out of the rfc6265bis public-suffix step itself, with no special case |
+| D-063 | 2026-10-23 | A partitioned cookie is stored with the request host as its partition key and sent only when the context's `top_level_site` (default: the request host) is the same | a non-browser client is its own top-level site; `store` keeps its signature, and an embedding context still cannot read another partition |
+| D-064 | 2026-10-23 | `IgnoreReason::Expired` is added (an already expired cookie with nothing to remove); `HttpOnlyFromNonHttp` is dropped from the locked API | every outcome of `store` has a reason; a variant `store` can never return would only mislead |
+| D-065 | 2026-10-23 | `Jar::export` and `Jar::import` use the format in `docs/FORMATS.md` with a BLAKE3 checksum through crypt-io (`hash-blake3` only, under `jar`); `import` validates every field as untrusted input and fails with the new `CookieError::InvalidJarData` | the checksum catches corruption, not tampering, so validation cannot rely on it; one audited hash in the tree rather than an in-house checksum |
+| D-066 | 2026-10-23 | Export writes cookies in creation order | the store reorders cookies on removal, and import assigns creation order afresh, so the export order is what keeps the `Cookie` header order after a round trip |
+| D-067 | 2026-10-23 | The jar scans its store linearly (eviction counts only the domain just written); a per-domain index is 0.6 work, measured first | correctness and bounded memory first; 3,000 cookies at most keep a scan in the tens of microseconds [est.], and the 0.6 benchmark against `cookie_store` decides the index |
+| D-068 | 2026-10-23 | Hosts are compared ASCII case-insensitively; the jar expects ASCII hosts (punycode for international names) | `RequestUrl` takes parts from any parser; lowercasing once per call makes `EXAMPLE.com` and `example.com` one host, and an export refuses anything but lowercase ASCII domains |
+| D-069 | 2026-10-23 | `Jar::with_store` and `Jar::cookies` are added to the locked jar API | a custom store needs a constructor, and operators and tests need to inspect what a jar holds without a `Cookie` header |

@@ -1,7 +1,7 @@
 # cookie-net - API Reference
 
 > Reference for every public item in `cookie-net`, with signatures, behaviour, the errors each item can return, and examples.
-> **Current release: `0.4.0` (signed and encrypted).** This document, locked at `0.2.0`, is the contract for `0.3.0` to `1.0.0`. Each item carries the version that ships it; items marked with a later version than the current release are specified here and not yet in the crate. Names and signatures do not change after `0.2.0` without a decision-log entry in [`../dev/PLAN.md`](../dev/PLAN.md).
+> **Current release: `0.5.0` (feature complete).** This document, locked at `0.2.0`, is the contract for `0.3.0` to `1.0.0`. Each item carries the version that ships it; items marked with a later version than the current release are specified here and not yet in the crate. Names and signatures do not change after `0.2.0` without a decision-log entry in [`../dev/PLAN.md`](../dev/PLAN.md).
 
 <sub>Copyright &copy; 2026 <strong>James Gober</strong>.</sub>
 
@@ -274,6 +274,8 @@ pub enum CookieError {
     RingFull,
     InvalidRetireTime,
     Crypto,
+    // the client jar
+    InvalidJarData,
     // conversions so `?` works everywhere
     Ambiguous(Ambiguous),
     Rejected(Rejected),
@@ -319,6 +321,7 @@ One error type for every fallible call, so `?` works in a handler that returns `
 | `RingFull` | a ring holds more than 8 keys, or no signing key (all removed with `without`) | drop retired keys past their time with `KeyRing::without`; keep one signing key |
 | `InvalidRetireTime` | a retire time is after 2156 (a time in milliseconds, say) | pass seconds |
 | `Crypto` | crypt-io reported a failure, such as the OS random source failing while sealing (fail closed: nothing was written) | retry; alert if it repeats |
+| `InvalidJarData` | `Jar::import` got bytes with a wrong magic, version, checksum, length, or field; nothing was imported | export again; never edit the bytes |
 | `Ambiguous(_)`, `Rejected(_)` | only through `?` on [`Ambiguous`](#ambiguous) and [`Rejected`](#rejected) | see those types |
 
 `code()` returns a stable snake_case identifier (`"host_prefix"`, `"invalid_value"`, `"ambiguous.duplicate"`, `"rejected.bad_tag"`) for metrics and events. Codes never change within a major version. When the stack's error-code library (error-core) is published, a mapping to its numbered codes is added behind a feature, without changing these strings.
@@ -1522,13 +1525,16 @@ Feature `jar`. A bounded store that follows the rfc6265bis storage model (sectio
 ### `Jar`
 
 ```rust
-pub struct Jar<P: PublicSuffix = NoSuffixList> { /* store, limits, suffixes */ }
+pub struct Jar<P: PublicSuffix = NoSuffixList, S: JarStore = MemoryStore> { /* store, limits, suffixes */ }
 
-impl Jar<NoSuffixList> {
+impl Jar<NoSuffixList, MemoryStore> {
     pub fn new() -> Self;
 }
-impl<P: PublicSuffix> Jar<P> {
+impl<P: PublicSuffix> Jar<P, MemoryStore> {
     pub fn with_public_suffix(suffixes: P) -> Self;
+}
+impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
+    pub fn with_store(suffixes: P, store: S) -> Self;
     pub fn with_limits(self, limits: JarLimits) -> Self;
 
     pub fn store<L: AsRef<[u8]> + ?Sized>(&mut self, url: &RequestUrl<'_>, set_cookie: &L, now: u64) -> StoreOutcome;
@@ -1544,15 +1550,21 @@ impl<P: PublicSuffix> Jar<P> {
     pub fn clear_domain(&mut self, domain: &str) -> usize;
     pub fn len(&self) -> usize;
     pub fn is_empty(&self) -> bool;
+    pub fn cookies(&self) -> impl Iterator<Item = &StoredCookie> + '_;
+
+    pub fn export(&self) -> Vec<u8>;
+    pub fn import(&mut self, bytes: &[u8], now: u64) -> Result<usize, CookieError>;   // InvalidJarData
 }
-impl Default for Jar<NoSuffixList> {}
-impl core::fmt::Debug for Jar {}   // counts and domains, never values
+impl Default for Jar<NoSuffixList, MemoryStore> {}
+impl<P: PublicSuffix, S: JarStore> core::fmt::Debug for Jar<P, S> {}   // counts and limits, never values
 ```
 
 - `store` applies the steps of section 5.7 that apply to a non-browser client, in order, including: ignore an empty name with an empty value; ignore a nameless cookie whose value starts with a prefix (step 22, threat T7); refuse `Secure` from a non-secure origin; leave secure cookies alone (a non-secure origin cannot overwrite or shadow a `Secure` cookie, threat T25); domain-match; the public suffix check; prefix requirements; `SameSite=None` and `Partitioned` need `Secure`; replacing a cookie keeps its creation time; expiry capped at 400 days. Every ignore has an [`IgnoreReason`](#storeoutcome-and-ignorereason).
 - `cookie_header` builds the `Cookie` header for a request (section 5.8.3): host-only or domain-match, path-match, `Secure` only over secure channels, `SameSite` against the context, longer paths first then earlier creation, `"; "` between pairs; it updates last-access times. `None` when no cookie applies. It uses `RequestContext::same_site()`; `cookie_header_for` takes the context.
-- `write_cookie_header` writes the same bytes into a sink and returns the count, for callers without an allocator in the hot path.
-- Partitioned cookies are keyed by the context's `top_level_site` (defaults to the request host), so they are never sent in another partition.
+- `write_cookie_header` writes the same bytes into a sink and returns how many cookies it holds; nothing is written when the sink reports too little room.
+- A nameless cookie is sent as its value alone (section 5.8.3).
+- Partitioned cookies are stored under the request host as their partition key (a non-browser client is its own top-level site) and sent only when the context's `top_level_site` (default: the request host) is the same, so they never cross partitions.
+- `export` writes the cookies in creation order in the format of [`FORMATS.md`](./FORMATS.md#jar-export-format-v1), with a BLAKE3 checksum; `import` checks the bytes as untrusted input (the checksum catches corruption; a re-checksummed edit is still validated field by field), skips cookies expired at `now`, and applies the jar's bounds. Exported bytes hold cookie values, so treat them as secrets.
 - Memory is bounded by [`JarLimits`](#jarlimits), never by input. When a domain or the jar is over its limit, expired cookies go first, then the least recently accessed.
 
 ```rust
@@ -1577,6 +1589,7 @@ assert_eq!(jar.cookie_header(&RequestUrl::http("app.example.com", "/"), now), No
 | JAR-7 | `with_limits`, eviction | P2 | 2 | 0.5 | n/a |
 | JAR-8 | `remove_expired`, `clear`, `clear_domain`, `len`, `is_empty` | P2 | 2 | 0.5 | linear |
 | JAR-9 | partitioned storage | P2 | 2 | 0.5 | n/a |
+| JAR-13 | `with_store`, `cookies` | P2 | 2 | 0.5 | n/a |
 
 ### `RequestUrl` and `RequestContext`
 
@@ -1600,7 +1613,7 @@ impl<'a> RequestContext<'a> {
 impl Default for RequestContext<'_> {}                             // same_site()
 ```
 
-The jar takes a URL as its parts, already parsed (by url-lib when it exists): `host` is the canonical host without a port, lowercase, with no trailing dot; `path` is the request path without the query. An IP-address host only ever gets host-only cookies.
+The jar takes a URL as its parts, already parsed (by url-lib when it exists): `host` is the host without a port, in ASCII (punycode for international names), with no trailing dot (it is compared case-insensitively); `path` is the request path without the query (an empty path is `/`). An IP-address host only ever gets host-only cookies.
 
 | Id | Grade | Tier | Ver |
 |---|---|---|---|
@@ -1612,9 +1625,9 @@ The jar takes a URL as its parts, already parsed (by url-lib when it exists): `h
 pub trait PublicSuffix {
     fn is_public_suffix(&self, domain: &str) -> bool;
 }
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct NoSuffixList;
-impl PublicSuffix for NoSuffixList {}
+impl PublicSuffix for NoSuffixList {}   // every domain is a public suffix: fail closed
 ```
 
 The public suffix list is about 200 KB and changes often, so it is not bundled (decision CN-6). With the default `NoSuffixList` the jar **fails closed**: a `Domain` equal to the request host makes a host-only cookie, and any other `Domain` value ignores the cookie. That prevents a site from setting a cookie for `co.uk` or `github.io` (supercookies, threat T22), at the cost of not sharing cookies across sibling subdomains unless the caller supplies a list.
@@ -1667,7 +1680,7 @@ pub enum IgnoreReason {
     SecurePrefix,
     SameSiteNoneNeedsSecure,
     PartitionedNeedsSecure,
-    HttpOnlyFromNonHttp,    // reserved for API-driven stores; never returned by `store`
+    Expired,                // already expired, and nothing stored to remove
 }
 ```
 
@@ -1678,11 +1691,36 @@ pub enum IgnoreReason {
 ### `JarStore` and `MemoryStore`
 
 ```rust
-pub trait JarStore { /* get, put, remove, iterate a domain, count, evict: fixed at 0.5 */ }
-pub struct MemoryStore { /* default */ }
+pub trait JarStore {
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool { self.len() == 0 }
+    fn get(&self, index: usize) -> Option<&StoredCookie>;
+    fn get_mut(&mut self, index: usize) -> Option<&mut StoredCookie>;
+    fn push(&mut self, cookie: StoredCookie);
+    fn swap_remove(&mut self, index: usize) -> Option<StoredCookie>;
+    fn clear(&mut self);
+}
+#[derive(Clone, Debug, Default)]
+pub struct MemoryStore { /* a Vec */ }
+impl JarStore for MemoryStore {}
+
+#[non_exhaustive]
+#[derive(Clone, PartialEq, Eq)]
+pub struct StoredCookie {
+    pub name: Vec<u8>, pub value: Vec<u8>,
+    pub domain: String,            // lowercase; the request host for a host-only cookie
+    pub path: Vec<u8>,
+    pub expiry: Option<u64>,       // None: a session cookie
+    pub creation: u64, pub last_access: u64,
+    pub host_only: bool, pub secure: bool, pub http_only: bool,
+    pub same_site: SameSiteAttr,
+    pub partition: Option<String>,
+    /* creation order, private */
+}
+impl core::fmt::Debug for StoredCookie {}   // value as its length
 ```
 
-The portfolio's enterprise rule puts stateful parts behind a trait so state can live in memory, on disk, or be shared. The jar is cookie-net's only state. At 0.5 the jar gains a second type parameter with a default, `Jar<P = NoSuffixList, S: JarStore = MemoryStore>`, which changes no code written against `Jar<P>`. Export and import in a versioned format with a BLAKE3 checksum (import refuses a mismatch) come with it, so a client can persist or replicate its cookies (decision D-035).
+The portfolio's enterprise rule puts stateful parts behind a trait, so state can live in memory, on disk, or be shared (decision D-035). A store only holds and indexes; the jar applies every rule and every bound, so a store cannot weaken them. A durable store writes through on `push` and `swap_remove`; a shared one does the same against its backend. Export and import move a whole jar between processes or nodes.
 
 | Id | Item | Grade | Tier | Ver |
 |---|---|---|---|---|

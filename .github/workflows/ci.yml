@@ -88,10 +88,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
-      # NFR-7: without the crypto features, parse-net is the whole tree.
+      # NFR-7: without the features that use crypt-io (`signed`,
+      # `encrypted`, and `jar` for its export checksum), parse-net is the
+      # whole tree.
       - name: Check the dependency tree
         run: |
-          tree=$(cargo tree --edges normal --prefix none --features alloc,client,jar | sort -u)
+          tree=$(cargo tree --edges normal --prefix none --features alloc,client | sort -u)
           echo "$tree"
           extra=$(echo "$tree" | grep -v -E '^(cookie-net|parse-net) ' || true)
           if [ -n "$extra" ]; then echo "unexpected dependencies: $extra"; exit 1; fi

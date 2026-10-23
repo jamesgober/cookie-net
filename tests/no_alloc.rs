@@ -170,3 +170,16 @@ fn test_signing_verifying_and_opening_allocate_nothing() {
     });
     assert_eq!(n, 0);
 }
+
+#[cfg(feature = "client")]
+#[test]
+fn test_client_parsing_allocates_nothing() {
+    let n = allocations(|| {
+        black_box(cookie_net::parse_set_cookie(
+            "id=a3fWa; Max-Age=2592000; Domain=.Example.com; Secure; SameSite=lax; Expires=Wed, 09 Jun 2021 10:18:14 GMT",
+        ));
+        black_box(cookie_net::cookie_date("Wednesday, 09-Jun-21 10:18:14 GMT"));
+        black_box(cookie_net::parse_set_cookie("\x01"));
+    });
+    assert_eq!(n, 0);
+}

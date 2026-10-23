@@ -13,6 +13,40 @@
 
 ---
 
+## [0.5.0] - 2026-10-23
+
+Feature complete: the client side and the cookie jar.
+
+### Added
+
+- Client parsing (feature `client`): `parse_set_cookie` (the rfc6265bis
+  section 5.6 user-agent algorithm), `SetCookieView`, `SameSiteAttr`, and
+  `cookie_date` (the section 5.1.1 algorithm). No allocator needed.
+- The cookie jar (feature `jar`): `Jar` with `store`, `store_all`,
+  `cookie_header`, `cookie_header_for`, `write_cookie_header`,
+  `remove_expired`, `clear`, `clear_domain`, `cookies`, `export`, `import`;
+  `RequestUrl`, `RequestContext`, `JarLimits`, `StoreOutcome`,
+  `IgnoreReason`, `PublicSuffix`, `NoSuffixList` (fail closed),
+  `JarStore`, `MemoryStore`, `StoredCookie`. The section 5.7 storage steps
+  (secure-origin rules, "leave secure cookies alone", prefixes, nameless
+  prefixed cookies, `SameSite=None` and `Partitioned` need `Secure`, the
+  400-day cap), section 5.8.3 retrieval, partitioned cookies, and bounded
+  memory with expired-first then least-recently-used eviction.
+- `CLEAR_SITE_DATA_COOKIES` for cookie-bomb recovery;
+  `CookieError::InvalidJarData`.
+- `docs/ARCHITECTURE.md`; the jar export format in `docs/FORMATS.md`.
+- Tests: builder output round-trips through the client parser; jar headers
+  read back through the server parser; user-agent behaviour cases; a
+  bounded-memory stream; export tampering. Fuzz targets `parse_set_cookie`,
+  `cookie_date`, `jar_ops`, one hour each clean.
+- Example `04_client_jar`.
+
+### Changed
+
+- `dev/PLAN.md` decisions D-061 to D-069.
+
+---
+
 ## [0.4.0] - 2026-10-23
 
 Signed and encrypted cookies.
@@ -137,7 +171,8 @@ The scaffold and the plan. No functional code yet.
 - `dev/PLAN.md` (purpose, scope, architecture, threats, ecosystem, open
   decisions, decision log), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 
-[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/jamesgober/cookie-net/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jamesgober/cookie-net/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jamesgober/cookie-net/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/jamesgober/cookie-net/compare/v0.1.0...v0.2.0
