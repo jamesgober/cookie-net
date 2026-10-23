@@ -28,7 +28,7 @@ fn test_t14_every_changed_byte_of_signed_and_sealed_values_refused() {
         (&sealed, &|m: &[u8]| o.open("flash", m, NOW).is_err()),
     ] {
         for i in 0..raw.len() {
-            for replacement in [b'A', b'_', b'-', b'0', b'z', b'~', b'%'] {
+            for replacement in *b"A_-0z~%" {
                 let mut m = raw.clone();
                 if m[i] == replacement {
                     continue;
