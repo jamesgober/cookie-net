@@ -121,3 +121,52 @@ fn test_building_and_writing_allocates_nothing() {
     });
     assert_eq!(n, 0);
 }
+
+#[cfg(feature = "encrypted")]
+#[test]
+fn test_signing_verifying_and_opening_allocate_nothing() {
+    use cookie_net::{Sealer, Signer};
+    let signer = Signer::new(*b"an example key, 32 bytes long!!!").unwrap();
+    let sealer = Sealer::new(*b"another example key, 32 bytes!!!").unwrap();
+    let signed = signer
+        .sign_until("prefs", "lang=fr", 1_800_000_000)
+        .unwrap();
+    let sealed = sealer.seal("flash", "Saved.").unwrap();
+    let mut plain = Vec::with_capacity(64);
+    let mut scratch = Vec::with_capacity(128);
+    let mut buf = [0u8; 256];
+    // warm the scratch buffer once
+    sealer
+        .seal_into(
+            "flash",
+            b"Saved.",
+            None,
+            &[],
+            &mut scratch,
+            &mut SliceSink::new(&mut buf),
+        )
+        .unwrap();
+    let n = allocations(|| {
+        let mut out = SliceSink::new(&mut buf);
+        signer
+            .sign_into("prefs", "lang=fr", Some(1_800_000_000), b"sid", &mut out)
+            .unwrap();
+        black_box(signer.verify("prefs", &signed, 1_700_000_000).unwrap());
+        black_box(
+            signer
+                .verify("prefs", "garbage-garbage-garbage-garbage", 0)
+                .unwrap_err(),
+        );
+        black_box(
+            sealer
+                .open_into("flash", &sealed, &[], 0, &mut plain)
+                .unwrap(),
+        );
+        let mut out = SliceSink::new(&mut buf);
+        sealer
+            .seal_into("flash", b"Saved.", None, &[], &mut scratch, &mut out)
+            .unwrap();
+        black_box(out.len());
+    });
+    assert_eq!(n, 0);
+}

@@ -4,7 +4,7 @@
 >
 > **Read order:** [`../REPS.md`](../REPS.md) &rarr; [`DIRECTIVES.md`](./DIRECTIVES.md) &rarr; **this file** &rarr; [`ROADMAP.md`](./ROADMAP.md) &rarr; [`../docs/API.md`](../docs/API.md) (the locked API).
 >
-> **Status:** `0.3.0`, plain cookies. API approved by James on 2026-10-23 at `0.2.0`. Rewritten from the crate's specification (decision D-004). The public API is in `docs/API.md`; this file holds the reasons.
+> **Status:** `0.4.0`, signed and encrypted cookies. API approved by James on 2026-10-23 at `0.2.0`. Rewritten from the crate's specification (decision D-004). The public API is in `docs/API.md`; this file holds the reasons.
 
 ---
 
@@ -431,3 +431,11 @@ At least one new defence idea per version, as hypothesis, method, and expected c
 | D-050 | 2026-10-23 | Doctests that call `encode` are gated on `alloc` with hidden lines; unit and integration tests use `encode_into`, so every test runs without default features | the rendered examples stay one line, and `cargo test --no-default-features` still checks the `no_std` path |
 | D-051 | 2026-10-23 | CI gains a bare-metal `thumbv7em-none-eabi` build (no features, and `alloc`), a dependency-tree check (only parse-net), a fuzz-target build, and a weekly 20-minute fuzz run of every target | NFR-6 and NFR-7 checked on every push; fuzz targets cannot rot between the one-hour runs |
 | D-052 | 2026-10-23 | An extension attribute's name (the part before `=`) must be a `token`; `x Max-Age=0` and ` Path=/` are refused as `InvalidExtension` | found by the `set_cookie_build` fuzz target: `extension-av` allows spaces, so `x Max-Age=0` is one unknown attribute to a user agent but could be read as two words by another parser; refusing it removes the differential at no cost to real attributes (`Priority=High`) |
+| D-053 | 2026-10-23 | The sealed AAD carries a 32-byte keyed BLAKE3 digest (under the sealing subkey) of the length-prefixed name and binding, not the name and binding themselves | crypt-io's AEAD takes the AAD as one slice; a fixed 59-byte AAD is built on the stack with no allocation, whatever the name and binding lengths; the digest binds both as firmly (collision resistance of BLAKE3) |
+| D-054 | 2026-10-23 | `Key::derive` takes a context of at most 200 bytes; a new `CookieError::ContextTooLong` refuses longer ones | the HKDF info (label, 0x00, context) is assembled in a stack buffer; contexts are service names |
+| D-055 | 2026-10-23 | A signed value must be plain `cookie-octet`s, without the quoted form | the signed value is the 30 header characters followed by the value, so a quoted value would put `"` in the middle of the cookie value, which no `SetCookie` accepts |
+| D-056 | 2026-10-23 | `RingFull` also reports a ring left with no signing key (every key removed with `without`) | one error for "this ring cannot sign"; no new variant for a case a deployment hits only by mistake |
+| D-057 | 2026-10-23 | An expiry of exactly 2020-01-01T00:00:00Z is refused (`ExpiresOutOfRange`) | it would encode as 0, which means "no expiry" |
+| D-058 | 2026-10-23 | When a sealed value authenticates but has expired, the plaintext already written to the caller's buffer is wiped (dropped through `Zeroizing`) before `Expired` is returned | the tag is checked before the expiry (so a forgery reports `BadTag`), which means decryption has happened; the buffer's capacity is lost only on this rare path |
+| D-059 | 2026-10-23 | `Signer` and `Sealer` validate the cookie name (a non-empty token of at most 4096 bytes) when signing or sealing | a value signed for a name no cookie can have is a caller bug; the MAC input's u16 length prefix also needs the bound |
+| D-060 | 2026-10-23 | CI builds `signed` for `thumbv7em-none-eabi` with no default features | NFR-6: signing works without `std`; linking needs an allocator, which a bare-metal application provides |

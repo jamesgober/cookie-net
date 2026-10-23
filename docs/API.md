@@ -1,7 +1,7 @@
 # cookie-net - API Reference
 
 > Reference for every public item in `cookie-net`, with signatures, behaviour, the errors each item can return, and examples.
-> **Current release: `0.3.0` (plain cookies).** This document, locked at `0.2.0`, is the contract for `0.3.0` to `1.0.0`. Each item carries the version that ships it; items marked with a later version than the current release are specified here and not yet in the crate. Names and signatures do not change after `0.2.0` without a decision-log entry in [`../dev/PLAN.md`](../dev/PLAN.md).
+> **Current release: `0.4.0` (signed and encrypted).** This document, locked at `0.2.0`, is the contract for `0.3.0` to `1.0.0`. Each item carries the version that ships it; items marked with a later version than the current release are specified here and not yet in the crate. Names and signatures do not change after `0.2.0` without a decision-log entry in [`../dev/PLAN.md`](../dev/PLAN.md).
 
 <sub>Copyright &copy; 2026 <strong>James Gober</strong>.</sub>
 
@@ -269,6 +269,7 @@ pub enum CookieError {
     // keys, signing, sealing
     WeakKey,
     KeyTooShort,
+    ContextTooLong,
     DuplicateKeyId,
     RingFull,
     InvalidRetireTime,
@@ -313,8 +314,9 @@ One error type for every fallible call, so `?` works in a handler that returns `
 | `Full` | the sink has no room | give a larger buffer; `encoded_len` says how large |
 | `WeakKey` | all 32 key bytes are equal (an unset or zeroed key) | load the real key |
 | `KeyTooShort` | `Key::derive` got a master shorter than 32 bytes | use a 32-byte or longer master |
+| `ContextTooLong` | `Key::derive` got a context over 200 bytes | use a short service name |
 | `DuplicateKeyId` | two keys in a ring share an id | give every key its own id |
-| `RingFull` | a ring holds more than 8 keys | drop retired keys past their time with `KeyRing::without` |
+| `RingFull` | a ring holds more than 8 keys, or no signing key (all removed with `without`) | drop retired keys past their time with `KeyRing::without`; keep one signing key |
 | `InvalidRetireTime` | a retire time is after 2156 (a time in milliseconds, say) | pass seconds |
 | `Crypto` | crypt-io reported a failure, such as the OS random source failing while sealing (fail closed: nothing was written) | retry; alert if it repeats |
 | `Ambiguous(_)`, `Rejected(_)` | only through `?` on [`Ambiguous`](#ambiguous) and [`Rejected`](#rejected) | see those types |
@@ -333,7 +335,7 @@ assert_eq!(CookieError::HostPrefix.code(), "host_prefix");
 
 | Id | Item | Grade | Tier | Ver |
 |---|---|---|---|---|
-| ERR-1 | `CookieError` and its variants | P0 | 1 | 0.3; the key variants (`WeakKey` to `Crypto`) and `Rejected(_)` are added at 0.4 |
+| ERR-1 | `CookieError` and its variants | P0 | 1 | 0.3; the key variants (`WeakKey` to `Crypto`) and `Rejected(_)` since 0.4 |
 | ERR-3 | `Display`, `Error`, `From` conversions | P0 | 1 | 0.3 |
 | ERR-4 | `code` | P1 | 2 | 0.3 |
 
@@ -1071,13 +1073,13 @@ Features `signed` or `encrypted`. Keys are 32 bytes, handed to cookie-net by the
 pub struct Key { /* 32 bytes, wiped on drop */ }
 impl Key {
     pub fn from_bytes(bytes: [u8; 32]) -> Key;
-    pub fn derive(master: &[u8], context: &[u8]) -> Result<Key, CookieError>;   // KeyTooShort, Crypto
+    pub fn derive(master: &[u8], context: &[u8]) -> Result<Key, CookieError>;   // KeyTooShort, ContextTooLong, Crypto
 }
 impl From<[u8; 32]> for Key {}
 impl core::fmt::Debug for Key {}   // "Key(..)"
 ```
 
-Every function that takes a key takes `impl Into<Key>`, so a `[u8; 32]` works directly. `derive` is HKDF-SHA-256 (crypt-io) with `info = "cookie-net v1 key" 0x00 || context`, for one master in key-vault serving several services (context = the service name). A master shorter than 32 bytes is refused.
+Every function that takes a key takes `impl Into<Key>`, so a `[u8; 32]` works directly. `derive` is HKDF-SHA-256 (crypt-io) with `info = "cookie-net v1 key" 0x00 || context`, for one master in key-vault serving several services (context = the service name, at most 200 bytes). A master shorter than 32 bytes is refused.
 
 `Signer` and `Sealer` each derive their own subkey from any key they are given (`"cookie-net v1 signed"` and `"cookie-net v1 sealed"`), so the same key can feed both and signing and sealing still never share key material (decision D-019).
 
@@ -1214,7 +1216,7 @@ impl core::fmt::Debug for Signer {}   // ids, roles, fingerprints
 - **`sign_until`** embeds an expiry that the server checks on every verification, whatever the browser does with `Max-Age` (threat T16). `expires` is Unix seconds from 2020-01-01 to 2156 (`ExpiresOutOfRange` otherwise).
 - **`sign_bound` / `verify_bound`** add a binding, such as a digest of the session id, to the MAC input without storing it in the cookie. A bound value verifies only with the same binding, so a valid signed cookie cannot be replayed into another user's browser by a sibling subdomain (cookie tossing of signed state), and it dies with the session (decision D-023, the 0.4 defence idea). An empty binding is the same as no binding.
 - **Skew**: an expiry is accepted while `now < expires + skew`, so nodes whose clocks differ by up to the skew agree. Default 60 seconds, the same as csrf-sec.
-- `value` must be `cookie-octet`s (`InvalidValue`), and the name plus the signed value at most 4096 bytes (`TooLarge`), both checked before any MAC work.
+- `value` must be `cookie-octet`s with no surrounding quotes (`InvalidValue`), and the name plus the signed value at most 4096 bytes (`TooLarge`), both checked before any MAC work.
 - Verification takes no lock and touches no shared state; the tag is compared in constant time through crypt-io `Tag<16>::ct_eq` (threat T18). No allocation.
 
 ```rust
@@ -1287,7 +1289,7 @@ if matches!(v.role, KeyRole::Retired { .. }) { metrics.count("cookie.retired_key
                        | u16be(len name) | name | u32be(len binding) | binding | value)
 ```
 
-128-bit tag: a forgery succeeds with probability 2^-128 per attempt, the tag length csrf-sec uses. Overhead 30 characters; expiry year limit 2156. The byte-exact layout, the subkey derivation, and test vectors go into `docs/FORMATS.md` at 0.4, so another implementation can interoperate.
+128-bit tag: a forgery succeeds with probability 2^-128 per attempt, the tag length csrf-sec uses. Overhead 30 characters; expiry year limit 2156. The byte-exact layout, the subkey derivation, and test vectors are in [`FORMATS.md`](./FORMATS.md), so another implementation can interoperate.
 
 ---
 
@@ -1395,10 +1397,10 @@ What `open_into` reports besides the plaintext, which is in the caller's buffer.
  cookie value = base64url_nopad(bytes)
  AEAD         = XChaCha20-Poly1305 (crypt-io Crypt::xchacha20_poly1305), random nonce from crypt-io
  AAD          = "cookie-net/v1/sealed" 0x00 | version | key id | expires
-                | u16be(len name) | name | u32be(len binding) | binding
+                | keyed BLAKE3(sealing subkey, u16be(len name) | name | u32be(len binding) | binding)
 ```
 
-Overhead 46 bytes before encoding. The byte-exact layout and vectors go into `docs/FORMATS.md` at 0.4.
+The AAD carries a 32-byte digest of the name and binding, so it is 59 bytes, fixed, and built on the stack (decision D-053). Overhead 46 bytes before encoding. The byte-exact layout and vectors are in [`FORMATS.md`](./FORMATS.md).
 
 ---
 

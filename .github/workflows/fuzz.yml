@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [cookie_header, cookie_lines, locate, set_cookie_build]
+        target: [cookie_header, cookie_lines, locate, set_cookie_build, signed_verify, sealed_open]
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@nightly

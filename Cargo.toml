@@ -3,7 +3,7 @@
 # =============================================================================
 [package]
 name    = "cookie-net"
-version = "0.3.0"
+version = "0.4.0"
 
 # Minimum Supported Rust Version (MSRV)
 rust-version = "1.85"
@@ -55,12 +55,13 @@ std = ["alloc"]
 # `SetCookie::encode` and the `String`-returning `sign*` and `seal*` functions.
 alloc = ["parse-net/alloc"]
 
-# Signed cookies: `Key`, `KeyRing`, `Signer` (0.4).
-signed = []
+# Signed cookies: `Key`, `KeyRing`, `Signer`. Keyed BLAKE3, HKDF, and wiping
+# through crypt-io; works without `std` given an allocator (dev/PLAN.md D-033).
+signed = ["dep:crypt-io", "crypt-io/mac-blake3", "crypt-io/kdf-hkdf", "crypt-io/zeroize"]
 
-# Encrypted cookies: `Sealer`, `Plaintext`, `Opened` (0.4). Needs the OS
-# random source, so it implies `std`.
-encrypted = ["signed", "std"]
+# Encrypted cookies: `Sealer`, `Plaintext`, `Opened`. XChaCha20-Poly1305
+# through crypt-io, which needs the OS random source, so it implies `std`.
+encrypted = ["signed", "std", "crypt-io/aead-chacha20", "crypt-io/std"]
 
 # Client side: `parse_set_cookie`, `cookie_date` (0.5).
 client = []
@@ -74,8 +75,12 @@ jar = ["client", "alloc"]
 [dependencies]
 # The shared HTTP grammar: byte classes, `find_byte`, `HttpDate`, and the
 # `Sink` writers (dev/PLAN.md section 2). First party, zero dependencies,
-# published; never a path dependency. crypt-io arrives at 0.4.
+# published; never a path dependency.
 parse-net = { version = "0.6.1", default-features = false }
+# Audited cryptography, the one recorded exception to the zero third-party
+# dependency rule (dev/PLAN.md section 8). Only behind `signed` and
+# `encrypted`, with crypt-io's defaults off.
+crypt-io = { version = "1.1", default-features = false, optional = true }
 
 
 # EXAMPLES (they use `SetCookie::encode`)
@@ -87,6 +92,10 @@ required-features = ["alloc"]
 [[example]]
 name = "02_sessions"
 required-features = ["alloc"]
+
+[[example]]
+name = "03_signed_and_sealed"
+required-features = ["encrypted"]
 
 
 # DEV DEPENDENCIES

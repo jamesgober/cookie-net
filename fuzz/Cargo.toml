@@ -13,6 +13,7 @@ parse-net = "0.6.1"
 
 [dependencies.cookie-net]
 path = ".."
+features = ["signed", "encrypted"]
 
 # Keeps this crate out of any parent workspace.
 [workspace]
@@ -42,6 +43,20 @@ bench = false
 [[bin]]
 name = "set_cookie_build"
 path = "fuzz_targets/set_cookie_build.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "signed_verify"
+path = "fuzz_targets/signed_verify.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sealed_open"
+path = "fuzz_targets/sealed_open.rs"
 test = false
 doc = false
 bench = false
