@@ -964,8 +964,14 @@ mod tests {
 
     #[test]
     fn test_pair_limit_truncates() {
-        let h64: String = (0..64).map(|i| format!("c{i}=1; ")).collect();
-        let h65: String = (0..65).map(|i| format!("c{i}=1; ")).collect();
+        let h64: String = (0..64)
+            .map(|i| format!("c{i}=1; "))
+            .collect::<Vec<_>>()
+            .concat();
+        let h65: String = (0..65)
+            .map(|i| format!("c{i}=1; "))
+            .collect::<Vec<_>>()
+            .concat();
         let s = Cookies::new(&h64).stats();
         assert_eq!((s.pairs, s.truncated), (64, false));
         let s = Cookies::new(&h65).stats();
@@ -1060,7 +1066,8 @@ mod tests {
         // a duplicate before the limit wins over truncation
         let h: String = core::iter::once(String::from("x=1; x=2; "))
             .chain((0..70).map(|i| format!("c{i}=1; ")))
-            .collect();
+            .collect::<Vec<_>>()
+            .concat();
         assert_eq!(
             Cookies::new(&h).get_unique("x"),
             Err(Ambiguous::Duplicate { count: 2 })
@@ -1090,7 +1097,10 @@ mod tests {
 
     #[test]
     fn test_locate_severity_cap_and_truncation() {
-        let h: String = (0..70).map(|i| format!("c{i}=1; ")).collect();
+        let h: String = (0..70)
+            .map(|i| format!("c{i}=1; "))
+            .collect::<Vec<_>>()
+            .concat();
         let found = Cookies::new(&h).locate("__Host-sid");
         assert_eq!(
             (found.lookup, found.severity_hint()),
@@ -1153,7 +1163,8 @@ mod tests {
     fn test_prefixed_duplicates_are_linear_and_bounded() {
         let h: String = (0..100)
             .map(|i| format!("__Host-n{i}=1; __Host-n{i}=2; "))
-            .collect();
+            .collect::<Vec<_>>()
+            .concat();
         let l = Limits::DEFAULT.max_pairs(1024);
         let s = Cookies::with_limits(&h, &l).unwrap().stats();
         assert_eq!(s.pairs, 200);

@@ -105,7 +105,8 @@ fn test_t4_header_8193_too_long() {
 fn test_t5_cookie_bomb_header_truncated_not_panicking() {
     let bomb: String = (0..300)
         .map(|i| format!("bomb{i}={}; ", "x".repeat(30)))
-        .collect();
+        .collect::<Vec<_>>()
+        .concat();
     let h = format!("{bomb}__Host-sid={TOKEN}");
     let found = cookie::locate(&h, "__Host-sid", &Limits::DEFAULT);
     assert_eq!(found.lookup, Lookup::HeaderTooLong);
@@ -120,7 +121,8 @@ fn test_t5_locate_truncated_is_not_one() {
     let h: String = (0..64)
         .map(|i| format!("c{i}=1; "))
         .chain([format!("__Host-sid={TOKEN}")])
-        .collect();
+        .collect::<Vec<_>>()
+        .concat();
     assert_eq!(
         cookie::locate(&h, "__Host-sid", &Limits::DEFAULT).lookup,
         Lookup::Truncated
