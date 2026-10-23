@@ -1,7 +1,7 @@
 # cookie-net - API Reference
 
 > Reference for every public item in `cookie-net`, with signatures, behaviour, the errors each item can return, and examples.
-> **Current release: `0.2.0` (design lock).** This document is the contract for `0.3.0` to `1.0.0`. Each item carries the version that ships it; items marked with a later version than the current release are specified here and not yet in the crate. Names and signatures do not change after `0.2.0` without a decision-log entry in [`../dev/PLAN.md`](../dev/PLAN.md).
+> **Current release: `0.3.0` (plain cookies).** This document, locked at `0.2.0`, is the contract for `0.3.0` to `1.0.0`. Each item carries the version that ships it; items marked with a later version than the current release are specified here and not yet in the crate. Names and signatures do not change after `0.2.0` without a decision-log entry in [`../dev/PLAN.md`](../dev/PLAN.md).
 
 <sub>Copyright &copy; 2026 <strong>James Gober</strong>.</sub>
 
@@ -300,7 +300,7 @@ One error type for every fallible call, so `?` works in a handler that returns `
 | `AttributeTooLong` | a `Path`, `Domain`, or extension value is over 1024 bytes (rfc6265bis section 5.6: user agents ignore it) | shorten it |
 | `InvalidPath { at }` | `Path` does not start with `/`, or holds a CTL or `;` (`path-value`, section 4.1.1) | pass an absolute path such as `/app` |
 | `InvalidDomain` | `Domain` is not a host name of LDH labels with at least one dot: a leading dot, a single label (`localhost`, `com`), an IP literal, an empty label, a label over 63 bytes | pass the bare registrable domain (`example.com`), or leave `Domain` unset for a host-only cookie |
-| `InvalidExtension { at }` | an extension attribute holds a CTL or `;` (`extension-av`, section 4.1.1) | remove the byte |
+| `InvalidExtension { at }` | an extension attribute holds a CTL or `;` (`extension-av`, section 4.1.1), is empty, or its name (the part before `=`) is not a `token` | use a token name such as `Priority=High` |
 | `ExtensionNotAllowed` | an extension attribute is named like a defined one (`Expires`, `Max-Age`, `Domain`, `Path`, `Secure`, `HttpOnly`, `SameSite`, `Partitioned`, any case) | use the typed setter instead |
 | `TooManyExtensions` | more than 8 extension attributes | use fewer |
 | `MaxAgeOutOfRange` | `Max-Age` is 0 or over 34,560,000 (400 days, section 5.5); for `elevated_cookie`, outside 60 to 3600 | use `delete` to remove a cookie; cap lifetimes at `MAX_LIFETIME` |
@@ -333,7 +333,7 @@ assert_eq!(CookieError::HostPrefix.code(), "host_prefix");
 
 | Id | Item | Grade | Tier | Ver |
 |---|---|---|---|---|
-| ERR-1 | `CookieError` and its variants | P0 | 1 | 0.3 (key variants used from 0.4) |
+| ERR-1 | `CookieError` and its variants | P0 | 1 | 0.3; the key variants (`WeakKey` to `Crypto`) and `Rejected(_)` are added at 0.4 |
 | ERR-3 | `Display`, `Error`, `From` conversions | P0 | 1 | 0.3 |
 | ERR-4 | `code` | P1 | 2 | 0.3 |
 
@@ -679,7 +679,7 @@ pub struct Stats {
     pub skipped: u16,               // broke the grammar or a length limit (not empty pairs)
     pub empty: u16,                 // ";;" or a trailing ';'
     pub loose_separators: u16,      // ';' without one SP after it, or with more whitespace
-    pub prefixed_duplicates: u16,   // extra occurrences of `__Host-` or `__Secure-` names
+    pub prefixed_duplicates: u16,   // extra occurrences of `__Host-` or `__Secure-` names (first 64 distinct names tracked)
     pub truncated: bool,            // stopped at `max_pairs`
     pub too_long: bool,             // over `max_header_len`: nothing was read
 }
@@ -729,7 +729,7 @@ pub fn locate<'a, H: AsRef<[u8]> + ?Sized>(header: &'a H, name: &str, limits: &L
 
 Everything the gateway needs about one credential cookie, in one pass with no allocation. `lookup` is the answer; `get_unique` is `lookup` reduced to a `Result`.
 
-`shadows` counts **shadow names**: pairs whose name is not `name` but equals it ignoring ASCII case, or equals it after removing a `__Host-` or `__Secure-` prefix from either side. For `__Host-sid` that is `__host-sid`, `__HOST-SID`, `sid`, `__Secure-sid`. cookie-net never sets those names, so their presence is evidence of a cookie-tossing attempt or a prefix-bypass probe (decision D-040, the 0.3 defence idea).
+`shadows` counts **shadow names**: pairs whose name is not `name` but equals it, ignoring ASCII case, once a `__Host-` or `__Secure-` prefix is removed from either side. For `__Host-sid` that is `__host-sid`, `__HOST-SID`, `sid`, `SID`, `__Secure-sid`. cookie-net never sets those names, so their presence is evidence of a cookie-tossing attempt or a prefix-bypass probe (decision D-040, the 0.3 defence idea).
 
 `severity_hint` (0 to 40, higher is worse): `One` with no shadows 0; `Missing` 0; `Many` on a prefixed name 30, on another name 10; `Truncated` or `HeaderTooLong` 10; plus 5 when `shadows > 0`, capped at 40.
 
@@ -957,7 +957,7 @@ In this order (the first one broken is returned):
 | 4 | `Path`, `Domain`, each extension at most 1024 bytes | `AttributeTooLong` | 5.6 |
 | 5 | `Path` starts with `/`, no CTL, no `;` | `InvalidPath { at }` | 4.1.1 `path-value`, 5.6.4 |
 | 6 | `Domain` is LDH labels with a dot, no leading dot, no IP literal, labels 1 to 63 bytes | `InvalidDomain` | 4.1.2.3, 5.6.3 |
-| 7 | extension: `*av-octet`, not a defined attribute name, at most 8 | `InvalidExtension { at }`, `ExtensionNotAllowed`, `TooManyExtensions` | 4.1.1 `extension-av` |
+| 7 | extension: `*av-octet` with a `token` name (the part before `=`), not a defined attribute name, at most 8 | `InvalidExtension { at }`, `ExtensionNotAllowed`, `TooManyExtensions` | 4.1.1 `extension-av` |
 | 8 | `Max-Age` 1 to 34,560,000 | `MaxAgeOutOfRange` | 5.5, 4.1.1 (`max-age-av` starts with a non-zero digit) |
 | 9 | `Expires` at most 400 days after `now` | `ExpiresOutOfRange` | 5.5 |
 | 10 | `__Host-` (any case): `Secure`, `Path=/`, no `Domain` | `HostPrefix` | 4.1.3.2, 5.4 |
@@ -965,7 +965,7 @@ In this order (the first one broken is returned):
 | 12 | `SameSite=None` needs `Secure` | `SameSiteNoneNeedsSecure` | 5.7 |
 | 13 | `Partitioned` needs `Secure` | `PartitionedNeedsSecure` | CHIPS 2.3, 3.1 |
 
-A deletion (`delete`) skips rules 2, 3, 8, and 9 (its value and expiry are fixed) and keeps every other rule, so a deletion of a `__Host-` cookie is still a valid `__Host-` cookie. Every rule has a test that cites its section, and a property test checks that no builder input produces a cookie that breaks rules 10 to 13 (threats T1, T2, T21).
+A deletion (`delete`) skips rules 2, 8, and 9 (its value and expiry are fixed) and keeps every other rule, so a deletion of a `__Host-` cookie is still a valid `__Host-` cookie. Every rule has a test that cites its section, and a property test checks that no builder input produces a cookie that breaks rules 10 to 13 (threats T1, T2, T21).
 
 | Id | Item | Grade | Tier | Ver | Cost [est.] |
 |---|---|---|---|---|---|
@@ -1699,7 +1699,7 @@ The portfolio's enterprise rule puts stateful parts behind a trait so state can 
 | `Plaintext` | yes | owned |
 | `Jar` | yes | mutates through `&mut self`; no internal locking |
 
-Every row is checked by a compile-time assertion. Sizes on 64-bit targets [est., confirmed at 0.3]: `Pair` 32 bytes, `Cookies` 48, `SetCookie` about 120, `Limits` 16, `Signer` and `Sealer` about 400 (eight subkeys, wiped on drop).
+Every row is checked by a test. Sizes on 64-bit targets, measured at 0.3: `Pair` 32 bytes, `Cookies` 48, `Lookup` 24, `Located` 40, `Stats` 12, `Limits` 16, `SetCookie` 232 (eight extension slots), `SetCookieBuilder` 256. `Signer` and `Sealer` about 400 [est.] (eight subkeys, wiped on drop).
 
 ---
 

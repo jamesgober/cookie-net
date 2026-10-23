@@ -13,6 +13,46 @@
 
 ---
 
+## [0.3.0] - 2026-10-23
+
+Plain cookies: the request side, the response side, and the session helpers.
+
+### Added
+
+- Reading the `Cookie` header (rfc6265bis section 4.2.1): `parse`, `get`,
+  `get_unique`, `get_all`, `locate`; `Cookies` over one header or several
+  field lines (HTTP/2 crumbs) with `iter`, `scan`, `stats`; `Pair`, `Stats`,
+  `Lookup`, `Located` with shadow names and `severity_hint`, `Prefix`.
+  Zero-copy, no allocation, linear time; bad pairs skipped and counted.
+- `Limits` (header length, pairs, name and value length) and `ValueMode`
+  (strict by default, lenient for hosts that share cookies with scripts).
+- Writing `Set-Cookie`: `SetCookie` (`new`, `delete`, `write_to`,
+  `encode_into`, `encode`, `encoded_len`, getters), `SetCookieBuilder` with
+  the thirteen rules, `SameSite`. Canonical serialization; `Domain` written
+  lowercase; deletions with `Expires` in 1970.
+- Session helpers: `session_cookie` and `elevated_cookie` for `__Host-`
+  tokens, with a 22-byte token floor.
+- `CookieError` with stable `code()` strings, `Ambiguous`, and the
+  constants `MINUTE`, `HOUR`, `DAY`, `MAX_LIFETIME`.
+- Tests: one per rfc6265bis rule with its section; attack tests for threats
+  T1 to T13, T19 to T23, and T28; property tests; counting-allocator tests;
+  complexity tests; WASP-shaped flows. Fuzz targets `cookie_header`,
+  `cookie_lines`, `locate`, `set_cookie_build`, each run for one hour clean;
+  `set_cookie_build` first found extension names with spaces (`x Max-Age=0`),
+  now refused: an extension's name must be a token.
+- Examples `01_quick_start` and `02_sessions`.
+- CI: a bare-metal `thumbv7em-none-eabi` build, a dependency-tree check, a
+  fuzz-target build, and a weekly fuzz workflow.
+
+### Changed
+
+- parse-net 0.6.1 is now a dependency (the only one).
+- README rewritten from the portfolio template with the Tier 1 quick start.
+- `docs/API.md`: measured type sizes, the shadow-name rule, and the rules a
+  deletion skips; `dev/PLAN.md` decisions D-045 to D-051.
+
+---
+
 ## [0.2.0] - 2026-10-23
 
 The design lock: the public API through 1.0, written down before the code. No
@@ -59,6 +99,7 @@ The scaffold and the plan. No functional code yet.
 - `dev/PLAN.md` (purpose, scope, architecture, threats, ecosystem, open
   decisions, decision log), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 
-[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/jamesgober/cookie-net/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/jamesgober/cookie-net/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/jamesgober/cookie-net/releases/tag/v0.1.0
