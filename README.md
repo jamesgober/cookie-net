@@ -21,7 +21,7 @@
         <strong>cookie-net</strong> reads the <code>Cookie</code> header and writes <code>Set-Cookie</code> headers, following RFC 6265bis. Secure defaults are the defaults: <code>Secure</code>, <code>HttpOnly</code>, and <code>SameSite=Lax</code> unless a cookie says otherwise, and the <code>__Host-</code> prefix for session cookies.
     </p>
     <p>
-        Signed cookies detect tampering; encrypted cookies also hide their content. Keys come from key-vault and the primitives from crypt-io, with key rotation built in so old cookies stay valid while new ones use the new key.
+        Signed cookies detect tampering; encrypted cookies also hide their content. The primitives come from crypt-io (keyed BLAKE3 and XChaCha20-Poly1305), the keys from the caller, and key rotation is staged so no node of a cluster ever refuses a cookie another node just signed.
     </p>
     <br>
     <hr>
@@ -29,7 +29,7 @@
         <strong>MSRV is 1.85+</strong> (Rust 2024 edition). <code>#![forbid(unsafe_code)]</code>.
     </p>
     <blockquote>
-        <strong>Status: scaffold (<code>0.1.0</code>).</strong> No functional code yet. The design is written down in <a href="./dev/PLAN.md"><code>dev/PLAN.md</code></a> and the schedule in <a href="./dev/ROADMAP.md"><code>dev/ROADMAP.md</code></a>; the public API is locked in <code>0.2.0</code>.
+        <strong>Status: design lock (<code>0.2.0</code>).</strong> The public API through <code>1.0</code> is written down in <a href="./docs/API.md"><code>docs/API.md</code></a>, the reasons in <a href="./dev/PLAN.md"><code>dev/PLAN.md</code></a>, and the schedule in <a href="./dev/ROADMAP.md"><code>dev/ROADMAP.md</code></a>. The code arrives with <code>0.3.0</code>.
     </blockquote>
 </div>
 
@@ -38,9 +38,9 @@
 
 ## Scope
 
-Cookie header parsing (bounded counts and lengths), Set-Cookie serialization with every attribute, prefix rules enforced, name and value validation, signed (HMAC) and encrypted (AEAD) cookies with key rotation, and expiry handling. Sessions themselves are gate-net's job; cookie-net only carries the token.
+`Cookie` header parsing (zero-copy, bounded, with duplicate detection for credentials), `Set-Cookie` writing with every attribute and every rfc6265bis rule enforced at build time, session-cookie helpers for `__Host-` tokens, signed (keyed BLAKE3) and encrypted (XChaCha20-Poly1305) cookies with expiry, session binding, and staged key rotation, and a client side (`Set-Cookie` parsing and a bounded cookie jar). Sessions themselves are gate-net's job, and CSRF tokens are csrf-sec's (never a cookie); cookie-net only carries the session token.
 
-See [`dev/PLAN.md`](./dev/PLAN.md) for the full scope, what is deliberately left to other crates, and the decision log.
+See [`docs/API.md`](./docs/API.md) for the API and [`dev/PLAN.md`](./dev/PLAN.md) for the full scope, what is deliberately left to other crates, the threats, and the decision log.
 
 <hr>
 <br>
@@ -55,8 +55,8 @@ See <a href="./dev/DIRECTIVES.md"><code>dev/DIRECTIVES.md</code></a> for enginee
     <h2>License</h2>
     <p>Licensed under either of</p>
     <ul>
-        <li><b>Apache License, Version 2.0</b> &mdash; <a href="./LICENSE-APACHE">LICENSE-APACHE</a></li>
-        <li><b>MIT License</b> &mdash; <a href="./LICENSE-MIT">LICENSE-MIT</a></li>
+        <li><b>Apache License, Version 2.0</b>: see <a href="./LICENSE-APACHE">LICENSE-APACHE</a></li>
+        <li><b>MIT License</b>: see <a href="./LICENSE-MIT">LICENSE-MIT</a></li>
     </ul>
     <p>at your option.</p>
 </div>
