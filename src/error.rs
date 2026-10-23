@@ -59,8 +59,9 @@ pub enum CookieError {
     /// least one dot: a leading dot, a single label, an IP address, an empty
     /// label, or a label over 63 bytes (rfc6265bis sections 4.1.2.3, 5.6.3).
     InvalidDomain,
-    /// An extension attribute holds a control byte or `;`, or is empty
-    /// (rfc6265bis section 4.1.1 `extension-av`).
+    /// An extension attribute holds a control byte or `;` (rfc6265bis
+    /// section 4.1.1 `extension-av`), is empty, or its name (the part before
+    /// `=`) is not a `token`.
     InvalidExtension {
         /// Offset of the first refused byte.
         at: u16,

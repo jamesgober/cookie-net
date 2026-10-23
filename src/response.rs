@@ -743,7 +743,8 @@ impl<'a> SetCookieBuilder<'a> {
     /// 4. `Path`, `Domain`, and each extension at most 1024 bytes (5.6)
     /// 5. `Path` starts with `/` and holds only `av-octet`s (4.1.1)
     /// 6. `Domain` is letter-digit-hyphen labels with a dot (4.1.2.3, 5.6.3)
-    /// 7. extensions: at most 8, `av-octet`s, no defined name (4.1.1)
+    /// 7. extensions: at most 8, `av-octet`s, a `token` name that is not a
+    ///    defined attribute (4.1.1)
     /// 8. `Max-Age` 1 to 34,560,000 (5.5)
     /// 9. `Expires` at most 400 days after `now` (5.5)
     /// 10. `__Host-`: `Secure`, `Path=/`, no `Domain` (4.1.3.2, 5.4)
@@ -899,7 +900,16 @@ fn check_extension(ext: &str) -> Result<(), CookieError> {
     if let Some(i) = name::first_non_av_octet(b) {
         return Err(CookieError::InvalidExtension { at: at(i) });
     }
-    let attr = ext.split('=').next().unwrap_or(ext).trim_matches(' ');
+    // The attribute name must be a token, so every parser splits it the same
+    // way (`x Max-Age=0` would be one unknown attribute to a user agent and
+    // possibly two words to something else).
+    let attr = ext.split('=').next().unwrap_or(ext);
+    if attr.is_empty() {
+        return Err(CookieError::InvalidExtension { at: 0 });
+    }
+    if let Some(i) = name::first_non_tchar(attr.as_bytes()) {
+        return Err(CookieError::InvalidExtension { at: at(i) });
+    }
     if DEFINED.iter().any(|d| d.eq_ignore_ascii_case(attr)) {
         return Err(CookieError::ExtensionNotAllowed);
     }
@@ -1156,12 +1166,30 @@ mod tests {
             err(SetCookie::builder("a", "1").extension("")),
             CookieError::InvalidExtension { at: 0 }
         );
+        // the attribute name is a token: no spaces, no empty name
+        for (ext, at) in [
+            (" Path=/x", 0),
+            ("x Max-Age=0", 1),
+            ("=v", 0),
+            ("Pri(ority", 3),
+        ] {
+            assert_eq!(
+                err(SetCookie::builder("a", "1").extension(ext)),
+                CookieError::InvalidExtension { at },
+                "{ext}"
+            );
+        }
+        assert!(
+            SetCookie::builder("a", "1")
+                .extension("Priority=High value, with spaces")
+                .build()
+                .is_ok()
+        );
         for d in [
             "Secure",
             "secure",
             "SameSite=None",
             "domain=evil.com",
-            " Path=/x",
             "max-age=1",
             "EXPIRES=x",
             "httponly",

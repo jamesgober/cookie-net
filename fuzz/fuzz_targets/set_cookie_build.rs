@@ -40,5 +40,7 @@ fuzz_target!(|data: &[u8]| {
         assert!(c.is_secure());
     }
     assert!(c.max_age().is_none_or(|s| (1..=cookie_net::MAX_LIFETIME).contains(&s)));
-    assert!(!line.contains("Max-Age=0"));
+    // cookie-net never writes `Max-Age=0` (an extension such as `x Max-Age=0`
+    // is an unknown attribute named `x Max-Age` to a user agent)
+    assert!(!line.split("; ").any(|attr| attr.starts_with("Max-Age=0")));
 });

@@ -300,7 +300,7 @@ One error type for every fallible call, so `?` works in a handler that returns `
 | `AttributeTooLong` | a `Path`, `Domain`, or extension value is over 1024 bytes (rfc6265bis section 5.6: user agents ignore it) | shorten it |
 | `InvalidPath { at }` | `Path` does not start with `/`, or holds a CTL or `;` (`path-value`, section 4.1.1) | pass an absolute path such as `/app` |
 | `InvalidDomain` | `Domain` is not a host name of LDH labels with at least one dot: a leading dot, a single label (`localhost`, `com`), an IP literal, an empty label, a label over 63 bytes | pass the bare registrable domain (`example.com`), or leave `Domain` unset for a host-only cookie |
-| `InvalidExtension { at }` | an extension attribute holds a CTL or `;` (`extension-av`, section 4.1.1) | remove the byte |
+| `InvalidExtension { at }` | an extension attribute holds a CTL or `;` (`extension-av`, section 4.1.1), is empty, or its name (the part before `=`) is not a `token` | use a token name such as `Priority=High` |
 | `ExtensionNotAllowed` | an extension attribute is named like a defined one (`Expires`, `Max-Age`, `Domain`, `Path`, `Secure`, `HttpOnly`, `SameSite`, `Partitioned`, any case) | use the typed setter instead |
 | `TooManyExtensions` | more than 8 extension attributes | use fewer |
 | `MaxAgeOutOfRange` | `Max-Age` is 0 or over 34,560,000 (400 days, section 5.5); for `elevated_cookie`, outside 60 to 3600 | use `delete` to remove a cookie; cap lifetimes at `MAX_LIFETIME` |
@@ -957,7 +957,7 @@ In this order (the first one broken is returned):
 | 4 | `Path`, `Domain`, each extension at most 1024 bytes | `AttributeTooLong` | 5.6 |
 | 5 | `Path` starts with `/`, no CTL, no `;` | `InvalidPath { at }` | 4.1.1 `path-value`, 5.6.4 |
 | 6 | `Domain` is LDH labels with a dot, no leading dot, no IP literal, labels 1 to 63 bytes | `InvalidDomain` | 4.1.2.3, 5.6.3 |
-| 7 | extension: `*av-octet`, not a defined attribute name, at most 8 | `InvalidExtension { at }`, `ExtensionNotAllowed`, `TooManyExtensions` | 4.1.1 `extension-av` |
+| 7 | extension: `*av-octet` with a `token` name (the part before `=`), not a defined attribute name, at most 8 | `InvalidExtension { at }`, `ExtensionNotAllowed`, `TooManyExtensions` | 4.1.1 `extension-av` |
 | 8 | `Max-Age` 1 to 34,560,000 | `MaxAgeOutOfRange` | 5.5, 4.1.1 (`max-age-av` starts with a non-zero digit) |
 | 9 | `Expires` at most 400 days after `now` | `ExpiresOutOfRange` | 5.5 |
 | 10 | `__Host-` (any case): `Secure`, `Path=/`, no `Domain` | `HostPrefix` | 4.1.3.2, 5.4 |
