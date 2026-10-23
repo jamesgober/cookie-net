@@ -835,7 +835,6 @@ fn classify<'a>(seg: &'a [u8], limits: &Limits, text: Option<&'a str>) -> Option
 /// FNV-1a hash, with an exact compare on a match. No allocation.
 struct DupTable<'a> {
     slots: [Option<&'a str>; DUP_SLOTS],
-    used: usize,
 }
 
 const DUP_SLOTS: usize = 16;
@@ -844,7 +843,6 @@ impl<'a> DupTable<'a> {
     const fn new() -> Self {
         Self {
             slots: [None; DUP_SLOTS],
-            used: 0,
         }
     }
 
@@ -867,14 +865,12 @@ impl<'a> DupTable<'a> {
                 Some(Some(_)) => {}
                 Some(empty @ None) => {
                     *empty = Some(name);
-                    self.used += 1;
                     return;
                 }
                 None => return,
             }
         }
         // Full: names past the first 16 distinct ones are not tracked.
-        debug_assert_eq!(self.used, DUP_SLOTS);
     }
 }
 

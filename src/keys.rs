@@ -632,9 +632,19 @@ pub(crate) fn check_name(name: &str) -> Result<(), CookieError> {
 /// The current Unix time, for the `*_now` functions.
 #[cfg(feature = "std")]
 pub(crate) fn now() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs())
+    unix_secs(std::time::SystemTime::now())
+}
+
+/// Seconds since the Unix epoch. A clock before 2020-01-01, the epoch of the
+/// expiry encoding, is wrong (a device without a real-time clock reads 1970
+/// plus its uptime), so it reads as the far future: expiring values and
+/// retired keys are refused, not accepted (fail closed; dev/PLAN.md D-075).
+#[cfg(feature = "std")]
+fn unix_secs(t: std::time::SystemTime) -> u64 {
+    match t.duration_since(std::time::UNIX_EPOCH) {
+        Ok(d) if d.as_secs() >= EPOCH_2020 => d.as_secs(),
+        _ => u64::MAX,
+    }
 }
 
 #[cfg(test)]
@@ -776,5 +786,31 @@ mod tests {
         let ring = KeyRing::new(KeyId(1), [0x41u8; 32]);
         let d = format!("{ring:?}");
         assert!(!d.contains("65") && !d.contains("AAAA"), "{d}");
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_clock_before_2020_fails_closed() {
+        use std::time::{Duration, UNIX_EPOCH};
+        assert_eq!(unix_secs(UNIX_EPOCH - Duration::from_secs(1)), u64::MAX);
+        assert_eq!(unix_secs(UNIX_EPOCH + Duration::from_secs(7)), u64::MAX);
+        assert_eq!(
+            unix_secs(UNIX_EPOCH + Duration::from_secs(EPOCH_2020 - 1)),
+            u64::MAX
+        );
+        assert_eq!(
+            unix_secs(UNIX_EPOCH + Duration::from_secs(EPOCH_2020)),
+            EPOCH_2020
+        );
+        assert!(unix_secs(std::time::SystemTime::now()) > 1_790_000_000);
+        // the far future refuses retired keys and expiring values
+        let ring = KeyRing::new(KeyId(1), *b"an example key, 32 bytes long!!!").retired(
+            KeyId(0),
+            *b"the second key, 32 bytes long!!!",
+            1_900_000_000,
+        );
+        let slots = Slots::derive(ring, b"test").unwrap();
+        assert!(slots.usable(KeyId(0), u64::MAX).is_none());
+        assert!(slots.usable(KeyId(1), u64::MAX).is_some());
     }
 }
