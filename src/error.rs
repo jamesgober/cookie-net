@@ -1,5 +1,6 @@
-//! Errors: [`CookieError`] for every fallible call, and [`Ambiguous`] for a
-//! unique lookup that could not give one answer.
+//! Errors: [`CookieError`] for every fallible call, [`Ambiguous`] for a
+//! unique lookup that could not give one answer, and [`Rejected`] for a
+//! signed or sealed cookie that did not verify.
 //!
 //! Neither type ever holds or prints input bytes. Positions (`at`) are byte
 //! offsets into the input that was refused, saturated at `u16::MAX`.
@@ -94,8 +95,25 @@ pub enum CookieError {
     HeaderTooLong,
     /// The sink has no room; `encoded_len` says how much is needed.
     Full,
+    /// All 32 key bytes are equal: an unset or zeroed key. Load the real one.
+    WeakKey,
+    /// `Key::derive` got a master shorter than 32 bytes.
+    KeyTooShort,
+    /// `Key::derive` got a context over 200 bytes.
+    ContextTooLong,
+    /// Two keys in a ring share an id.
+    DuplicateKeyId,
+    /// A ring holds more than 8 keys, or no signing key.
+    RingFull,
+    /// A retired key's time is after 2156 (a time in milliseconds, say).
+    InvalidRetireTime,
+    /// crypt-io reported a failure, such as the OS random source failing while
+    /// sealing. Nothing was written (fail closed).
+    Crypto,
     /// A unique lookup could not give one answer (through `?` only).
     Ambiguous(Ambiguous),
+    /// A signed or sealed cookie did not verify (through `?` only).
+    Rejected(Rejected),
 }
 
 impl CookieError {
@@ -132,6 +150,18 @@ impl CookieError {
             Self::PartitionedNeedsSecure => "partitioned_needs_secure",
             Self::HeaderTooLong => "header_too_long",
             Self::Full => "full",
+            Self::WeakKey => "weak_key",
+            Self::KeyTooShort => "key_too_short",
+            Self::ContextTooLong => "context_too_long",
+            Self::DuplicateKeyId => "duplicate_key_id",
+            Self::RingFull => "ring_full",
+            Self::InvalidRetireTime => "invalid_retire_time",
+            Self::Crypto => "crypto",
+            Self::Rejected(Rejected::Malformed) => "rejected.malformed",
+            Self::Rejected(Rejected::UnsupportedVersion) => "rejected.unsupported_version",
+            Self::Rejected(Rejected::UnknownKey) => "rejected.unknown_key",
+            Self::Rejected(Rejected::BadTag) => "rejected.bad_tag",
+            Self::Rejected(Rejected::Expired) => "rejected.expired",
             Self::Ambiguous(Ambiguous::Duplicate { .. }) => "ambiguous.duplicate",
             Self::Ambiguous(Ambiguous::Truncated) => "ambiguous.truncated",
             Self::Ambiguous(Ambiguous::HeaderTooLong) => "ambiguous.header_too_long",
@@ -197,7 +227,15 @@ impl fmt::Display for CookieError {
             Self::PartitionedNeedsSecure => f.write_str("Partitioned cookie needs Secure"),
             Self::HeaderTooLong => f.write_str("Cookie header is longer than the limit"),
             Self::Full => f.write_str("output buffer is full"),
+            Self::WeakKey => f.write_str("key bytes are all equal: not a real key"),
+            Self::KeyTooShort => f.write_str("master secret is shorter than 32 bytes"),
+            Self::ContextTooLong => f.write_str("key derivation context is over 200 bytes"),
+            Self::DuplicateKeyId => f.write_str("two keys in the ring share an id"),
+            Self::RingFull => f.write_str("key ring holds more than 8 keys or no signing key"),
+            Self::InvalidRetireTime => f.write_str("retire time is after 2156"),
+            Self::Crypto => f.write_str("cryptographic operation failed"),
             Self::Ambiguous(a) => fmt::Display::fmt(&a, f),
+            Self::Rejected(r) => fmt::Display::fmt(&r, f),
         }
     }
 }
@@ -207,6 +245,12 @@ impl core::error::Error for CookieError {}
 impl From<Ambiguous> for CookieError {
     fn from(a: Ambiguous) -> Self {
         Self::Ambiguous(a)
+    }
+}
+
+impl From<Rejected> for CookieError {
+    fn from(r: Rejected) -> Self {
+        Self::Rejected(r)
     }
 }
 
@@ -275,6 +319,95 @@ impl fmt::Display for Ambiguous {
 
 impl core::error::Error for Ambiguous {}
 
+/// Why a signed or sealed cookie was refused.
+///
+/// Clients never learn the reason: treat every `Rejected` as "cookie absent"
+/// and report the reason as an event.
+///
+/// | Variant | Most likely | `severity_hint` |
+/// |---|---|---|
+/// | `Malformed` | tampering or truncation | 10 |
+/// | `UnsupportedVersion` | tampering, or a cookie from a newer deployment | 5 |
+/// | `UnknownKey` | an old cookie after its key left the ring | 1 |
+/// | `BadTag` | forgery, or a value moved between names or sessions | 40 |
+/// | `Expired` | an old tab, or client clock games | 1 |
+///
+/// # Examples
+///
+/// ```
+/// use cookie_net::Rejected;
+///
+/// assert_eq!(Rejected::BadTag.severity_hint(), 40);
+/// assert_eq!(Rejected::Expired.code(), "expired");
+/// ```
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Rejected {
+    /// Wrong length, bad base64url, or a non-canonical encoding.
+    Malformed,
+    /// A format version this build does not know.
+    UnsupportedVersion,
+    /// The key id is not in the ring, or its retire time has passed.
+    UnknownKey,
+    /// Forged, altered, moved from another cookie name, or bound to another
+    /// session.
+    BadTag,
+    /// The embedded expiry has passed (plus the skew allowance).
+    Expired,
+}
+
+impl Rejected {
+    /// A stable snake_case identifier for metrics and events.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// assert_eq!(cookie_net::Rejected::UnknownKey.code(), "unknown_key");
+    /// ```
+    #[must_use]
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::Malformed => "malformed",
+            Self::UnsupportedVersion => "unsupported_version",
+            Self::UnknownKey => "unknown_key",
+            Self::BadTag => "bad_tag",
+            Self::Expired => "expired",
+        }
+    }
+
+    /// A suggested severity, 0 to 40, higher is worse (the scale WASP's gates
+    /// use).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// assert_eq!(cookie_net::Rejected::Malformed.severity_hint(), 10);
+    /// ```
+    #[must_use]
+    pub const fn severity_hint(self) -> u8 {
+        match self {
+            Self::Malformed => 10,
+            Self::UnsupportedVersion => 5,
+            Self::UnknownKey | Self::Expired => 1,
+            Self::BadTag => 40,
+        }
+    }
+}
+
+impl fmt::Display for Rejected {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Malformed => "signed cookie refused: malformed",
+            Self::UnsupportedVersion => "signed cookie refused: unsupported version",
+            Self::UnknownKey => "signed cookie refused: unknown key",
+            Self::BadTag => "signed cookie refused: bad tag",
+            Self::Expired => "signed cookie refused: expired",
+        })
+    }
+}
+
+impl core::error::Error for Rejected {}
+
 /// A byte offset as the `u16` the error variants carry.
 pub(crate) fn at(offset: usize) -> u16 {
     u16::try_from(offset).unwrap_or(u16::MAX)
@@ -287,7 +420,7 @@ mod tests {
 
     use super::*;
 
-    const ALL: [CookieError; 22] = [
+    const ALL: [CookieError; 34] = [
         CookieError::EmptyName,
         CookieError::InvalidName { at: 1 },
         CookieError::InvalidValue { at: 2 },
@@ -307,6 +440,18 @@ mod tests {
         CookieError::PartitionedNeedsSecure,
         CookieError::HeaderTooLong,
         CookieError::Full,
+        CookieError::WeakKey,
+        CookieError::KeyTooShort,
+        CookieError::ContextTooLong,
+        CookieError::DuplicateKeyId,
+        CookieError::RingFull,
+        CookieError::InvalidRetireTime,
+        CookieError::Crypto,
+        CookieError::Rejected(Rejected::Malformed),
+        CookieError::Rejected(Rejected::UnsupportedVersion),
+        CookieError::Rejected(Rejected::UnknownKey),
+        CookieError::Rejected(Rejected::BadTag),
+        CookieError::Rejected(Rejected::Expired),
         CookieError::Ambiguous(Ambiguous::Duplicate { count: 2 }),
         CookieError::Ambiguous(Ambiguous::Truncated),
         CookieError::Ambiguous(Ambiguous::HeaderTooLong),
@@ -357,6 +502,26 @@ mod tests {
         assert_eq!(Ambiguous::Duplicate { count: 2 }.code(), "duplicate");
         assert_eq!(Ambiguous::Truncated.code(), "truncated");
         assert_eq!(Ambiguous::HeaderTooLong.code(), "header_too_long");
+    }
+
+    #[test]
+    fn test_rejected_codes_and_severity() {
+        let all = [
+            Rejected::Malformed,
+            Rejected::UnsupportedVersion,
+            Rejected::UnknownKey,
+            Rejected::BadTag,
+            Rejected::Expired,
+        ];
+        let sev: std::vec::Vec<u8> = all.iter().map(|r| r.severity_hint()).collect();
+        assert_eq!(sev, [10, 5, 1, 40, 1]);
+        for r in all {
+            assert_eq!(
+                CookieError::from(r).code(),
+                std::format!("rejected.{}", r.code())
+            );
+            assert!(r.to_string().starts_with("signed cookie refused"));
+        }
     }
 
     #[test]

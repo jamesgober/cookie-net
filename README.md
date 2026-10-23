@@ -32,7 +32,7 @@
 </p>
 
 <p>
-    Signed cookies (keyed BLAKE3) and encrypted cookies (XChaCha20-Poly1305), both through crypt-io with staged key rotation, arrive in <code>0.4</code>; a client-side <code>Set-Cookie</code> parser and cookie jar in <code>0.5</code>. The whole API, with the version of each item, is in <a href="./docs/API.md"><code>docs/API.md</code></a>.
+    Signed cookies (keyed BLAKE3) and encrypted cookies (XChaCha20-Poly1305), both through crypt-io, carry small client-held state: the cookie name is bound into the MAC, an optional expiry is enforced by the server, an optional binding ties a value to one session, and key rings rotate in stages so no node of a cluster refuses a cookie another node just made. A client-side <code>Set-Cookie</code> parser and cookie jar arrive in <code>0.5</code>. The whole API, with the version of each item, is in <a href="./docs/API.md"><code>docs/API.md</code></a>.
 </p>
 
 ---
@@ -52,11 +52,18 @@
 - **Session helpers** - `session_cookie` and `elevated_cookie` for `__Host-` tokens with their attributes fixed; `SetCookie::delete` for logout.
 - **Any output** - write into any `parse_net::Sink` (a stack buffer, a `Vec`), with the exact length known first.
 
+### **Signed and encrypted cookies** (features `signed`, `encrypted`)
+- **Tamper-evident or private** - `Signer` (keyed BLAKE3, 128-bit tag) keeps the value readable; `Sealer` (XChaCha20-Poly1305, 192-bit random nonce) hides it.
+- **Bound to the name, optionally to the session** - a value cannot move to another cookie, and with `sign_bound` or `seal_bound` not to another user either.
+- **Server-enforced expiry** - `sign_until` and `seal_until` embed an expiry checked on every request, with a clock-skew allowance for clusters.
+- **Key rings for clusters** - one signing key and up to seven others, staged rotation (`accept`, switch, drop), fingerprints to compare rings across nodes, per-purpose subkeys from one master.
+- **Precise refusals** - `Rejected` says why (`Malformed`, `UnsupportedVersion`, `UnknownKey`, `BadTag`, `Expired`) with a stable code and a severity hint; tags compared in constant time.
+
 ### **Reliability and safety**
 - **No unsafe code** - `#![forbid(unsafe_code)]`.
 - **No panics** - every fallible call returns `Result`; fuzzed, property-tested, and covered by one attack test per threat.
 - **Secrets never print** - `Debug` shows names and lengths, never values; no `Display` for a value.
-- **`no_std`** - the core needs neither `std` nor an allocator; one first-party dependency (parse-net).
+- **`no_std`** - the core needs neither `std` nor an allocator; one first-party dependency (parse-net), plus crypt-io behind the crypto features.
 
 ---
 
@@ -64,17 +71,22 @@
 
 ```toml
 [dependencies]
-cookie-net = "0.3"
+cookie-net = "0.4"
+
+# signed and encrypted cookies:
+cookie-net = { version = "0.4", features = ["signed", "encrypted"] }
 
 # no_std, no allocator:
-cookie-net = { version = "0.3", default-features = false }
+cookie-net = { version = "0.4", default-features = false }
 ```
 
 | Feature | Default | Adds |
 |---|---|---|
 | `std` | yes | implies `alloc`; the clock-reading helpers of later versions |
-| `alloc` | through `std` | `SetCookie::encode` |
-| `signed`, `encrypted`, `client`, `jar` | no | declared; their code arrives in 0.4 and 0.5 |
+| `alloc` | through `std` | `SetCookie::encode`, `String`-returning signing |
+| `signed` | no | `Key`, `KeyRing`, `Signer` (crypt-io; works without `std` given an allocator) |
+| `encrypted` | no | `Sealer`; implies `signed` and `std` |
+| `client`, `jar` | no | declared; their code arrives in 0.5 |
 
 ---
 
@@ -117,6 +129,21 @@ assert_eq!(found.shadows, 1);                // `sid` beside `__Host-sid`: repor
 assert_eq!(found.severity_hint(), 5);
 ```
 
+### **Signed and encrypted state**
+
+```rust
+use cookie_net::{self as cookie, Sealer, Signer};
+
+let now = 1_800_000_000;
+let signer = Signer::new(signing_key)?;                       // [u8; 32] from key-vault
+let v = signer.sign_until("plan_banner", "dismissed", now + 30 * cookie::DAY)?;
+assert_eq!(signer.verify("plan_banner", &v, now)?, "dismissed");
+
+let sealer = Sealer::new(sealing_key)?;
+let flash = sealer.seal_until("flash", "Payment received.", now + 60)?;
+assert_eq!(sealer.open("flash", &flash, now)?.as_str(), Some("Payment received."));
+```
+
 ### **Rules that cannot be broken**
 
 ```rust
@@ -132,11 +159,11 @@ More in [`examples/`](./examples) and [`docs/API.md`](./docs/API.md).
 
 ---
 
-## Status: plain cookies (`0.3.0`)
+## Status: signed and encrypted (`0.4.0`)
 
-**Done:** the request side, the response side, and the session helpers, each rfc6265bis rule tested with its section, property tests, counting-allocator tests, complexity tests, attack tests for the threats this version covers, and four fuzz targets.
+**Done:** the request side, the response side, the session helpers (0.3), and signed and encrypted cookies with key rings, staged rotation, fingerprints, expiry, and session binding (0.4); each rule tested with its source, property, counting-allocator, complexity, and attack tests, test vectors for both formats, and six fuzz targets.
 
-**Next:** `0.4` signed and encrypted cookies with key rings and staged rotation; `0.5` the client side and the cookie jar; `0.6` benchmarks against `cookie`, `biscotti`, and `cookie_store`; `0.7` hardening. The schedule is in [`dev/ROADMAP.md`](./dev/ROADMAP.md).
+**Next:** `0.5` the client side and the cookie jar; `0.6` benchmarks against `cookie`, `biscotti`, and `cookie_store`; `0.7` hardening. The schedule is in [`dev/ROADMAP.md`](./dev/ROADMAP.md).
 
 **API stability:** the API was locked at `0.2.0`; names change only with a recorded decision in [`dev/PLAN.md`](./dev/PLAN.md). Performance numbers are targets until `0.6` measures them.
 
@@ -153,6 +180,8 @@ More in [`examples/`](./examples) and [`docs/API.md`](./docs/API.md).
 ## Documentation
 
 - **[API Reference](./docs/API.md)** - every public item, its version, errors, and examples
+- **[Which cookie, when](./docs/COOKIES.md)** - session tokens, signed and sealed state, `SameSite`, the rotation runbook
+- **[Formats](./docs/FORMATS.md)** - the byte-exact signed and sealed formats, with test vectors
 - **[Plan](./dev/PLAN.md)** - design, threats, decisions
 - **[Roadmap](./dev/ROADMAP.md)** - versions and exit criteria
 - **[docs.rs](https://docs.rs/cookie-net)** - rustdoc

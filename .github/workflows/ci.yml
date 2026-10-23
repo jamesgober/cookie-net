@@ -73,6 +73,10 @@ jobs:
         run: cargo build --target thumbv7em-none-eabi --no-default-features
       - name: Build (alloc)
         run: cargo build --target thumbv7em-none-eabi --no-default-features --features alloc
+      # `signed` builds without `std` (it needs an allocator at link time,
+      # dev/PLAN.md D-033).
+      - name: Build (signed)
+        run: cargo build --target thumbv7em-none-eabi --no-default-features --features signed
       - name: Clippy (no features)
         run: cargo clippy --target thumbv7em-none-eabi --no-default-features -- -D warnings
 

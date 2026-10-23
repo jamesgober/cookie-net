@@ -13,6 +13,44 @@
 
 ---
 
+## [0.4.0] - 2026-10-23
+
+Signed and encrypted cookies.
+
+### Added
+
+- Keys (feature `signed`): `Key` (wiped on drop, `Key::derive` from a
+  master with HKDF-SHA-256), `KeyId`, `KeyRole` (`Signing`, `Accepted`,
+  `Retired`), `KeyRing` (`new`, `accept`, `retired`, `rotated`, `without`),
+  `KeyInfo`, `KeyFingerprint`.
+- `Signer` (feature `signed`): keyed BLAKE3 with a 128-bit tag over the
+  version, key id, expiry, name, binding, and value; `sign`, `sign_until`,
+  `sign_bound`, `sign_into`, `verify`, `verify_bound`, `verify_detailed`,
+  `verify_now`, `with_skew`, `keys`, `fingerprint`; `Verified`.
+- `Sealer` (feature `encrypted`): XChaCha20-Poly1305 with a random 192-bit
+  nonce and the name, header, and binding as associated data; `seal`,
+  `seal_until`, `seal_bound`, `seal_into`, `open`, `open_bound`, `open_into`,
+  `open_now`, `sealed_len`, `max_plaintext`; `Plaintext` (wiped on drop) and
+  `Opened`.
+- `Rejected` with `code()` and `severity_hint()`; `CookieError` variants
+  `WeakKey`, `KeyTooShort`, `ContextTooLong`, `DuplicateKeyId`, `RingFull`,
+  `InvalidRetireTime`, `Crypto`, `Rejected(_)`.
+- `docs/FORMATS.md` (byte-exact formats, derivations, test vectors) and
+  `docs/COOKIES.md` (which cookie to use when, the rotation runbook).
+- Tests: every single-bit change refused; values never verify under another
+  name, key, or binding; a two-node staged-rotation simulation; pinned
+  vectors; counting-allocator and constant-time smoke tests. Fuzz targets
+  `signed_verify` and `sealed_open`, one hour each clean.
+- Example `03_signed_and_sealed`; CI builds `signed` for bare metal.
+
+### Changed
+
+- crypt-io 1.1 is an optional dependency behind `signed` and `encrypted`,
+  with its default features off.
+- `dev/PLAN.md` decisions D-053 to D-060.
+
+---
+
 ## [0.3.0] - 2026-10-23
 
 Plain cookies: the request side, the response side, and the session helpers.
@@ -99,7 +137,8 @@ The scaffold and the plan. No functional code yet.
 - `dev/PLAN.md` (purpose, scope, architecture, threats, ecosystem, open
   decisions, decision log), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 
-[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/jamesgober/cookie-net/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jamesgober/cookie-net/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/jamesgober/cookie-net/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/jamesgober/cookie-net/releases/tag/v0.1.0

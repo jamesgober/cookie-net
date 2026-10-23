@@ -45,13 +45,13 @@ Exit: every rule has a test citing its section; a property test shows no builder
 
 ## v0.4.0 - Signed and encrypted
 
-- [ ] KEY-1 to KEY-6: `Key`, `derive`, `KeyId`, `KeyRole`, `KeyInfo`, `KeyFingerprint`, `KeyRing` with `accept`, `retired`, `rotated`, `without`.
-- [ ] SGN-1 to SGN-10: `Signer` with expiry, binding, skew, `Verified`, `Rejected` with codes and severity hints.
-- [ ] SEAL-1 to SEAL-9: `Sealer`, `Plaintext`, `Opened`.
-- [ ] Private `b64` module copied from csrf-sec with its tests. **Removal:** replaced by encode-lib in the first cookie-net version after encode-lib is published; the formats do not change.
-- [ ] `docs/FORMATS.md` with byte-exact layouts and test vectors; `docs/COOKIES.md` (which cookie to use when, the `__Host-` rule, `SameSite` choices, why there is no CSRF cookie, the rotation runbook, cookie-bomb recovery).
+- [x] KEY-1 to KEY-6: `Key`, `derive`, `KeyId`, `KeyRole`, `KeyInfo`, `KeyFingerprint`, `KeyRing` with `accept`, `retired`, `rotated`, `without`.
+- [x] SGN-1 to SGN-10: `Signer` with expiry, binding, skew, `Verified`, `Rejected` with codes and severity hints.
+- [x] SEAL-1 to SEAL-9: `Sealer`, `Plaintext`, `Opened`.
+- [x] Private `b64` module copied from csrf-sec with its tests. **Removal:** replaced by encode-lib in the first cookie-net version after encode-lib is published; the formats do not change.
+- [x] `docs/FORMATS.md` with byte-exact layouts and test vectors; `docs/COOKIES.md` (which cookie to use when, the `__Host-` rule, `SameSite` choices, why there is no CSRF cookie, the rotation runbook, cookie-bomb recovery).
 
-Exit: every single-bit change of a signed or sealed value is refused; a value never verifies under another name, key, or binding; staged rotation in a two-node simulation refuses nothing, and retired keys become `UnknownKey` after their time; the constant-time smoke test passes; fuzz targets `signed_verify`, `sealed_open` run one hour clean.
+Exit: every single-bit change of a signed or sealed value is refused; a value never verifies under another name, key, or binding; staged rotation in a two-node simulation refuses nothing, and retired keys become `UnknownKey` after their time; the constant-time smoke test passes; fuzz targets `signed_verify`, `sealed_open` run one hour clean. **Met 2026-10-23.**
 
 ## v0.5.0 - Feature complete (client side, defence helpers)
 

@@ -54,9 +54,13 @@
 //!
 //! ## Features
 //!
-//! `std` (default) adds the clock-reading helpers of later versions and
-//! implies `alloc`, which adds [`SetCookie::encode`]. Without default features
-//! the crate is `no_std` and needs no allocator.
+//! `std` (default) adds the `*_now` functions that read the system clock and
+//! implies `alloc`, which adds [`SetCookie::encode`] and the `String`-returning
+//! signing functions. `signed` adds keys and `Signer` (keyed BLAKE3, through
+//! crypt-io; it works without `std` but needs an allocator, because crypt-io
+//! links `alloc`). `encrypted` adds `Sealer` (XChaCha20-Poly1305; needs `std`
+//! for the OS random source). Without default features the core is `no_std`
+//! and needs no allocator.
 
 #![doc(html_root_url = "https://docs.rs/cookie-net")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -69,19 +73,36 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+#[cfg(feature = "signed")]
+mod b64;
 mod error;
+#[cfg(feature = "signed")]
+mod keys;
 mod limits;
 mod name;
 mod request;
 mod response;
+#[cfg(feature = "encrypted")]
+mod sealed;
 mod session;
+#[cfg(feature = "signed")]
+mod signed;
 
-pub use error::{Ambiguous, CookieError};
+pub use error::{Ambiguous, CookieError, Rejected};
+#[cfg(feature = "signed")]
+#[cfg_attr(docsrs, doc(cfg(feature = "signed")))]
+pub use keys::{Key, KeyFingerprint, KeyId, KeyInfo, KeyRing, KeyRole};
 pub use limits::{Limits, ValueMode};
 pub use name::Prefix;
 pub use request::{Cookies, GetAll, Iter, Located, Lookup, Pair, Stats};
 pub use response::{SameSite, SetCookie, SetCookieBuilder};
+#[cfg(feature = "encrypted")]
+#[cfg_attr(docsrs, doc(cfg(feature = "encrypted")))]
+pub use sealed::{Opened, Plaintext, Sealer};
 pub use session::{elevated_cookie, session_cookie};
+#[cfg(feature = "signed")]
+#[cfg_attr(docsrs, doc(cfg(feature = "signed")))]
+pub use signed::{Signer, Verified};
 
 /// Crate version string, populated by Cargo at build time.
 ///
