@@ -55,7 +55,7 @@
 //! ## Features
 //!
 //! `std` (default) adds the `*_now` functions that read the system clock and
-//! implies `alloc`, which adds [`SetCookie::encode`] and the `String`-returning
+//! implies `alloc`, which adds `SetCookie::encode` and the `String`-returning
 //! signing functions. `signed` adds keys and `Signer` (keyed BLAKE3, through
 //! crypt-io; it works without `std` but needs an allocator, because crypt-io
 //! links `alloc`). `encrypted` adds `Sealer` (XChaCha20-Poly1305; needs `std`

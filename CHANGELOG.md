@@ -43,6 +43,13 @@ Hardening: every threat proven by a test, every parser fuzzed for a day.
 - CI's security job audits the dependency versions current Rust resolves
   (D-078); local fuzz runs use a 60-second timeout and fork mode (D-079).
 
+### Fixed
+
+- Five intra-doc links to items behind a feature (`SetCookie::encode`,
+  `Sealer::with_ring`, `Signer::sign_until`, `Signer::sign_bound`) broke
+  `cargo doc` with warnings as errors for builds without `alloc` or
+  `encrypted`. CI now builds the docs for every feature set.
+
 ---
 
 ## [0.6.0] - 2026-10-23

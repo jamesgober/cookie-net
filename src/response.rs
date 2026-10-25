@@ -74,8 +74,9 @@ impl SameSite {
 ///
 /// The only ways to get one are [`new`](Self::new), [`delete`](Self::delete),
 /// [`SetCookieBuilder::build`], and the session helpers; each checks every
-/// rule. There is no `Display`: [`encode`](Self::encode) and its siblings are
-/// the explicit ways to turn a cookie (and the token in it) into bytes.
+/// rule. There is no `Display`: [`write_to`](Self::write_to),
+/// [`encode_into`](Self::encode_into), and `encode` (feature `alloc`) are the
+/// explicit ways to turn a cookie (and the token in it) into bytes.
 /// `Debug` shows the attributes and the value's length, never the value.
 ///
 /// # Examples
