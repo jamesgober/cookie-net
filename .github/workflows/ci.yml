@@ -52,6 +52,24 @@ jobs:
         env:
           RUSTDOCFLAGS: "-D warnings"
 
+  docs:
+    name: Docs (every feature set)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # An intra-doc link to an item behind a feature breaks `cargo doc` for
+      # every build without that feature.
+      - name: Doc each feature set
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: |
+          for f in "" alloc std signed "signed,alloc" encrypted client "client,alloc" jar "signed,client"; do
+            echo "== features: [$f]"
+            cargo doc --no-deps --no-default-features ${f:+--features $f}
+          done
+
   no-std:
     name: Bare metal (thumbv7em-none-eabi / ${{ matrix.rust }})
     runs-on: ubuntu-latest

@@ -239,7 +239,9 @@ impl Signer {
     ///
     /// # Errors
     ///
-    /// As [`sign_until`](Self::sign_until), and `Full`.
+    /// `EmptyName` or `InvalidName`; `InvalidValue` when `value` is not
+    /// `cookie-octet`s; `TooLarge` when the name and signed value pass 4096
+    /// bytes; `ExpiresOutOfRange`; `Full` when the sink has too little room.
     ///
     /// # Examples
     ///
@@ -338,7 +340,8 @@ impl Signer {
         self.verify_detailed(name, raw, &[], now).map(|v| v.value)
     }
 
-    /// Verifies a value signed with [`sign_bound`](Self::sign_bound).
+    /// Verifies a value signed with a binding (`sign_bound`, or
+    /// [`sign_into`](Self::sign_into) with a non-empty binding).
     ///
     /// # Errors
     ///

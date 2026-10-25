@@ -40,8 +40,15 @@ Hardening: every threat proven by a test, every parser fuzzed for a day.
   `unreachable!`, `dbg!`, and print macros in library code; the two
   remaining debug assertions are gone, so fuzz and release builds run the
   same code.
-- CI's security job audits the dependency versions current Rust resolves
-  (D-078); local fuzz runs use a 60-second timeout and fork mode (D-079).
+- Local fuzz runs use a 60-second timeout and fork mode, because the shared
+  build machine's clock steps produce false timeouts (D-079).
+
+### Fixed
+
+- Five intra-doc links to items behind a feature (`SetCookie::encode`
+  twice, `Sealer::with_ring`, `Signer::sign_until`, `Signer::sign_bound`) broke
+  `cargo doc` with warnings as errors for builds without `alloc` or
+  `encrypted`. CI now builds the docs for every feature set.
 
 ---
 

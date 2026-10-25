@@ -291,8 +291,8 @@ struct Entry {
 /// One signing key and up to seven others, in a fixed array.
 ///
 /// The methods never fail, so a ring reads as one chain;
-/// [`Signer::with_ring`](crate::Signer::with_ring) and
-/// [`Sealer::with_ring`](crate::Sealer::with_ring) check it. `Debug` prints
+/// [`Signer::with_ring`](crate::Signer::with_ring) and `Sealer::with_ring`
+/// (feature `encrypted`) check it. `Debug` prints
 /// ids and roles, never key bytes.
 ///
 /// # Examples
