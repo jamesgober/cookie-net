@@ -13,6 +13,38 @@
 
 ---
 
+## [0.7.0] - 2026-10-25
+
+Hardening: every threat proven by a test, every parser fuzzed for a day.
+
+### Added
+
+- `docs/SECURITY.md`: the threat model T1 to T30, with each defence, its
+  cost, and the test that proves it; what cookie-net does not defend; the
+  hardening evidence; operating guidance.
+- `docs/PLATFORM-NOTES.md`: what each feature needs from the platform, the
+  platforms CI proves, the clock, the random source, constant-time code, and
+  byte order.
+- Attack tests for T14 to T30 (`tests/threats_crypto_client.rs`).
+- A jar soak (`tests/soak.rs`, ignored, Linux): random `Set-Cookie` streams
+  for 500 hosts with export and import, checking that resident memory stays
+  flat. One hour: 48 million operations, peak resident memory 18 to 19 MiB.
+- Every fuzz target run for at least 24 hours on this code with no findings.
+
+### Changed
+
+- `verify_now` and `open_now` treat a system clock before 2020-01-01 as the
+  far future, so expiring values and retired keys are refused. A clock
+  before 1970 used to read as 0, which accepted them.
+- Clippy denies `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`,
+  `unreachable!`, `dbg!`, and print macros in library code; the two
+  remaining debug assertions are gone, so fuzz and release builds run the
+  same code.
+- CI's security job audits the dependency versions current Rust resolves
+  (D-078); local fuzz runs use a 60-second timeout and fork mode (D-079).
+
+---
+
 ## [0.6.0] - 2026-10-23
 
 Optimisation: measured against the best Rust crates, and made faster where
@@ -201,7 +233,8 @@ The scaffold and the plan. No functional code yet.
 - `dev/PLAN.md` (purpose, scope, architecture, threats, ecosystem, open
   decisions, decision log), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 
-[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/jamesgober/cookie-net/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jamesgober/cookie-net/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/jamesgober/cookie-net/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jamesgober/cookie-net/compare/v0.3.0...v0.4.0

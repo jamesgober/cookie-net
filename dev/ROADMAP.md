@@ -75,9 +75,13 @@ Exit: each comparable row is at least 20% faster than the best competitor, or ha
 
 ## v0.7.0 - Hardening
 
-- [ ] Fuzz 24 hours per target; attack tests for T1 to T28; jar soak (one hour, flat memory); `docs/SECURITY.md`, `docs/PLATFORM-NOTES.md`.
+- [x] Fuzz 24 hours per target: all nine, no findings (D-079 for the false timeouts the loaded machine produced).
+- [x] Attack tests for T1 to T30 (`tests/threats.rs`, `tests/threats_crypto_client.rs`); T26 documented, because crypt-io has no hook for a failing random source.
+- [x] No panic paths in library code, enforced by clippy (D-076); the clock fails closed (D-075).
+- [x] Jar soak (one hour, flat memory; D-077): 48 million operations, peak resident memory 19.0 MiB in the second quarter and 18.4 MiB in the last.
+- [x] `docs/SECURITY.md`, `docs/PLATFORM-NOTES.md`.
 
-Exit: no open finding; every threat proven by a test.
+Exit: no open finding; every threat proven by a test. **Met 2026-10-25.**
 
 ## v0.8.0 - Alpha
 

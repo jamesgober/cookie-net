@@ -68,6 +68,22 @@
 #![no_std]
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
+// No panicking shortcut in library code (dev/DIRECTIVES.md section 2); tests
+// may use them.
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr
+    )
+)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

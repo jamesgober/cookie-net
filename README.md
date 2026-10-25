@@ -77,16 +77,16 @@
 
 ```toml
 [dependencies]
-cookie-net = "0.6"
+cookie-net = "0.7"
 
 # signed and encrypted cookies:
-cookie-net = { version = "0.6", features = ["signed", "encrypted"] }
+cookie-net = { version = "0.7", features = ["signed", "encrypted"] }
 
 # an outbound client:
-cookie-net = { version = "0.6", features = ["jar"] }
+cookie-net = { version = "0.7", features = ["jar"] }
 
 # no_std, no allocator:
-cookie-net = { version = "0.6", default-features = false }
+cookie-net = { version = "0.7", default-features = false }
 ```
 
 | Feature | Default | Adds |
@@ -194,15 +194,17 @@ Measured against `cookie`, `biscotti`, and `cookie_store` on the same bytes ([`d
 | jar `Cookie` header | 56% |
 | sealing, opening | about 4 times **slower** than AES-256-GCM: the cipher; XAES-256-GCM is planned |
 
-## Status: optimisation (`0.6.0`)
+## Status: hardening (`0.7.0`)
 
 **Done:** the request side, the response side, the session helpers (0.3); signed and encrypted cookies with key rings, staged rotation, fingerprints, expiry, and session binding (0.4); the client parser, the cookie-date algorithm, the cookie jar with a store trait and export, and `Clear-Site-Data` for cookie-bomb recovery (0.5). Each rule tested with its source; property, counting-allocator, complexity, and attack tests; test vectors; nine fuzz targets.
 
 **0.6:** measured against `cookie`, `biscotti`, and `cookie_store`; signing, verifying, and reading made 24 to 35% faster with the same output.
 
-**Next:** `0.7` hardening: 24-hour fuzzing of every target, the remaining attack tests, a jar soak, `docs/SECURITY.md`. The schedule is in [`dev/ROADMAP.md`](./dev/ROADMAP.md).
+**0.7:** every fuzz target run for 24 hours with no findings, attack tests for every threat T1 to T30, a one-hour jar soak with flat memory, no panic paths in library code (enforced by clippy), and a system clock that fails closed. The threat model is [`docs/SECURITY.md`](./docs/SECURITY.md).
 
-**API stability:** the API was locked at `0.2.0`; names change only with a recorded decision in [`dev/PLAN.md`](./dev/PLAN.md). Performance numbers are targets until `0.6` measures them.
+**Next:** `0.8` alpha, when the WASP gates, gate-net, and web-net are built on cookie-net. The schedule is in [`dev/ROADMAP.md`](./dev/ROADMAP.md).
+
+**API stability:** the API was locked at `0.2.0`; names change only with a recorded decision in [`dev/PLAN.md`](./dev/PLAN.md). Measured performance is in [`docs/PERFORMANCE.md`](./docs/PERFORMANCE.md).
 
 ---
 
@@ -221,6 +223,8 @@ Measured against `cookie`, `biscotti`, and `cookie_store` on the same bytes ([`d
 - **[Formats](./docs/FORMATS.md)** - the byte-exact signed, sealed, and jar export formats, with test vectors
 - **[Architecture](./docs/ARCHITECTURE.md)** - modules, data flow, memory, and bounds
 - **[Performance](./docs/PERFORMANCE.md)** - measured numbers, method, and the sealing plan
+- **[Security](./docs/SECURITY.md)** - the threat model, each defence, its cost, and the test that proves it
+- **[Platform notes](./docs/PLATFORM-NOTES.md)** - what each feature needs, the clock, the random source, constant-time code
 - **[Plan](./dev/PLAN.md)** - design, threats, decisions
 - **[Roadmap](./dev/ROADMAP.md)** - versions and exit criteria
 - **[docs.rs](https://docs.rs/cookie-net)** - rustdoc
