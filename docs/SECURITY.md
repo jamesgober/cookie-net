@@ -71,7 +71,7 @@ cookie-net reads `Cookie` headers, writes `Set-Cookie` headers, signs and encryp
 
 ## Hardening evidence
 
-- Fuzzing: every parser and decoder has a target (`cookie_header`, `cookie_lines`, `locate`, `set_cookie_build`, `signed_verify`, `sealed_open`, `parse_set_cookie`, `cookie_date`, `jar_ops`), each run for 24 hours on the 0.7.0 code (the release notes record the run). One issue was found at 0.3 (T29) and fixed; one timeout at 0.6 was the shared machine stalling and did not reproduce.
+- Fuzzing: every parser and decoder has a target (`cookie_header`, `cookie_lines`, `locate`, `set_cookie_build`, `signed_verify`, `sealed_open`, `parse_set_cookie`, `cookie_date`, `jar_ops`), each run for at least 24 hours on the 0.7.0 code with no findings (the 0.7.0 release notes give the runs). One issue was found at 0.3 (T29) and fixed. The timeouts reported on the shared build machine (one at 0.6, six at 0.7) were the machine, not the code: the 0.7 ones gave a negative elapsed time from a clock step, and every input runs in milliseconds on its own (dev/PLAN.md D-079).
 - Property tests for every invariant of `dev/DIRECTIVES.md` section 4: no builder input breaks a prefix, `SameSite=None`, or `Partitioned` rule; no serialized cookie holds a forbidden byte; any changed bit of a signed or sealed value is refused; a sealed value never opens under another name.
 - Counting-allocator tests prove that reading, writing into a stack buffer, signing, verifying, and opening into a reused buffer allocate nothing.
 - Complexity tests prove linear time on 64 KiB adversarial headers.

@@ -11,6 +11,12 @@
 
 ## [Unreleased]
 
+---
+
+## [0.7.0] - 2026-10-25
+
+Hardening: every threat proven by a test, every parser fuzzed for a day.
+
 ### Added
 
 - `docs/SECURITY.md`: the threat model T1 to T30, with each defence, its
@@ -22,7 +28,8 @@
 - Attack tests for T14 to T30 (`tests/threats_crypto_client.rs`).
 - A jar soak (`tests/soak.rs`, ignored, Linux): random `Set-Cookie` streams
   for 500 hosts with export and import, checking that resident memory stays
-  flat.
+  flat. One hour: 48 million operations, peak resident memory 18 to 19 MiB.
+- Every fuzz target run for at least 24 hours on this code with no findings.
 
 ### Changed
 
@@ -33,6 +40,8 @@
   `unreachable!`, `dbg!`, and print macros in library code; the two
   remaining debug assertions are gone, so fuzz and release builds run the
   same code.
+- CI's security job audits the dependency versions current Rust resolves
+  (D-078); local fuzz runs use a 60-second timeout and fork mode (D-079).
 
 ---
 
@@ -224,7 +233,8 @@ The scaffold and the plan. No functional code yet.
 - `dev/PLAN.md` (purpose, scope, architecture, threats, ecosystem, open
   decisions, decision log), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 
-[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/jamesgober/cookie-net/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jamesgober/cookie-net/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/jamesgober/cookie-net/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jamesgober/cookie-net/compare/v0.3.0...v0.4.0
