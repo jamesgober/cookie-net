@@ -90,15 +90,40 @@ Exit: no open finding; every threat proven by a test. **Met 2026-10-25.**
 
 Exit: the end-to-end WASP login flow is green with cookie-net; csrf-sec's expectations of the session cookie verified.
 
-## v0.9.0 - Beta and release candidates
+## v0.9.0 - Beta
 
 - [ ] gate-net and web-net use it end to end (DIRECTIVES definition of done, item 10); fetch-net uses the jar if it exists by then; API frozen except fixes.
 
 Exit: an adversarial review with every finding fixed test-first.
 
+## v0.9.x - Pre-1.0 polish
+
+After the beta and before any 1.0 release candidate (D-080). Nothing accepted during 0.x becomes final without being looked at again here.
+
+- [ ] **Revisit every accepted gap, deferred item, known issue, and missed target.** Each is fixed, or kept with its reason restated and checked against the current state of the crates it depends on. The list as of 0.7.0:
+  - Sealing (rows C8, C9) about 4 times slower than AES-256-GCM, waiting on XAES-256-GCM in crypt-io (D-073, the "Moved, with reason" note under 0.6).
+  - T26, a failing random source while sealing: documented, not tested, waiting on a crypt-io hook (PLAN 13.2).
+  - RUSTSEC-2026-0385: builds on Rust 1.85 and 1.86 still resolve `ctutils` 0.4.2 (unreachable from cookie-net; D-078). Recheck the advisory, crypt-io's fix, and the MSRV.
+  - `signed` needs an allocator because crypt-io's MAC and KDF paths do (D-033).
+  - The private base64url copy, until encode-lib is published (D-008).
+  - error-core codes behind a feature, once error-core is published (D-027).
+  - The public suffix list: trait and fail-closed default only (CN-6, D-010); a data crate is James's call.
+  - The long constant-time run for the tag path, promised "before 1.0" in PLAN section 9 (T18).
+  - The requests to gate-net (`SESSIONS.md` 9.3 and the read cost) and to crypt-io in PLAN 13.2: done, or still open.
+  - Every cost in `docs/API.md` and PLAN still marked [est.]: measured, or the estimate kept with its reason.
+  - Tests run on 64-bit targets only; 32-bit and bare metal are build-only (`docs/PLATFORM-NOTES.md`).
+  - The jar's linear scan instead of a per-domain index (D-067), rechecked against real consumer jar sizes.
+  - The PLAN section 12 ideas not yet built (`encrypted` without `std`, Device Bound Session Credentials) and the staging false-positive measurements for the prefixed-duplicate and shadow-name signals: built, measured, or moved after 1.0 with a reason.
+  - Anything added after 0.7.0.
+- [ ] **A fresh performance pass against the competitors.** Rerun cookie-net-bench (equivalence tests, criterion, and the ratio tool) on the final code against the current releases of `cookie`, `biscotti`, and `cookie_store`; profile and tune every row that is under the 20% rule or has regressed by more than 5%; update `docs/PERFORMANCE.md`.
+- [ ] **The security and edge-case review again.** Every threat T1 to T30 and any added since, every edge-case list from the specification, the RFC 6265bis drafts published since 0.7, new advisories against the dependency tree, and the cookie-handling CVEs of other frameworks since 0.7; then fuzz every target for 24 hours on the final code.
+- [ ] **The 1.0 readiness note for James** (`dev/READINESS-1.0.md`): what was fixed, what is still open and why, the measured numbers, and a recommendation for each open item.
+
+Exit: every item above is fixed or written up in the readiness note; no open item is left out of the note.
+
 ## v1.0.0 - Stable
 
-- [ ] The full audit in `docs/STABILITY-1.0.md`; API frozen until 2.0. Only with James's go-ahead.
+- [ ] Release candidates, then the full audit in `docs/STABILITY-1.0.md`; API frozen until 2.0. Only with James's go-ahead, after he has read the readiness note.
 
 ## After 1.0
 
