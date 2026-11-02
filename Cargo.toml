@@ -3,7 +3,7 @@
 # =============================================================================
 [package]
 name    = "cookie-net"
-version = "0.7.0"
+version = "0.7.1"
 
 # Minimum Supported Rust Version (MSRV)
 rust-version = "1.85"
@@ -82,7 +82,7 @@ parse-net = { version = "0.6.1", default-features = false }
 # Audited cryptography, the one recorded exception to the zero third-party
 # dependency rule (dev/PLAN.md section 8). Only behind `signed` and
 # `encrypted`, with crypt-io's defaults off.
-crypt-io = { version = "1.1", default-features = false, optional = true }
+crypt-io = { version = "1.2.2", default-features = false, optional = true }
 
 
 # EXAMPLES (they use `SetCookie::encode`)

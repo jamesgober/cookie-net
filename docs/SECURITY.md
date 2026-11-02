@@ -54,7 +54,7 @@ cookie-net reads `Cookie` headers, writes `Set-Cookie` headers, signs and encryp
 | T23 | secrets in logs | `Debug` prints lengths, never values or keys; no `Display` for values; errors carry positions | `test_t23_*`, property tests over random values | none |
 | T24 | memory exhaustion in the jar | `JarLimits`, eviction, 4096 bytes per cookie | `test_t24_*`, `tests/soak.rs` (one hour, flat resident memory) | bounded |
 | T25 | a non-secure origin overwriting a `Secure` cookie in the jar | "leave secure cookies alone" | `test_t25_*`, `test_insecure_origin_cannot_toss_over_a_secure_cookie` | none |
-| T26 | a random-source failure while sealing | crypt-io returns an error; nothing is written; `Crypto` is returned | documented: crypt-io 1.1 has no hook to make its random source fail; requested (PLAN 13.2) | none |
+| T26 | a random-source failure while sealing | crypt-io returns an error; nothing is written; `Crypto` is returned | documented: crypt-io has no hook to make its random source fail; requested (PLAN 13.2) | none |
 | T27 | a valid signed value of one user tossed into another user's browser | optional session binding (`sign_bound`, `seal_bound`) | `test_t27_*`, property tests | 5 ns [est.] |
 | T28 | a credential written with an empty or tiny token by a caller bug | `session_cookie` and `elevated_cookie` refuse tokens under 22 bytes | `test_t28_*` | 1 ns |
 | T29 | an extension attribute read differently by two parsers (`x Max-Age=0`) | extension names must be tokens | `test_t29_*`; found by fuzzing at 0.3 | none |
@@ -67,7 +67,6 @@ cookie-net reads `Cookie` headers, writes `Set-Cookie` headers, signs and encryp
 - **Tossing of non-prefixed cookies.** Without `__Host-`, a sibling subdomain can set a cookie of the same name; cookie-net reports duplicates but cannot tell which one is genuine.
 - **Old browsers** that ignore prefixes or `SameSite`; the server-side checks still hold.
 - **Key custody.** cookie-net never stores keys; protecting them is the caller's (key-vault).
-- **Advisories in code it does not call.** CI audits the dependency tree on every change. One advisory is known and unreachable: RUSTSEC-2026-0385 (`ctutils` before 0.4.4) is fixed only in releases that need Rust 1.87, so a build on Rust 1.85 or 1.86 still resolves the old version. It reaches the tree through `digest`'s MAC verification, which cookie-net never calls; tags are compared with crypt-io's `Tag::ct_eq` (dev/PLAN.md D-078).
 
 ## Hardening evidence
 
@@ -75,6 +74,7 @@ cookie-net reads `Cookie` headers, writes `Set-Cookie` headers, signs and encryp
 - Property tests for every invariant of `dev/DIRECTIVES.md` section 4: no builder input breaks a prefix, `SameSite=None`, or `Partitioned` rule; no serialized cookie holds a forbidden byte; any changed bit of a signed or sealed value is refused; a sealed value never opens under another name.
 - Counting-allocator tests prove that reading, writing into a stack buffer, signing, verifying, and opening into a reused buffer allocate nothing.
 - Complexity tests prove linear time on 64 KiB adversarial headers.
+- CI audits the dependency tree on every change, for both the MSRV resolution and the newest one (`cargo audit`, `cargo deny`). RUSTSEC-2026-0385 (`ctutils`) reached the tree through crypt-io, was never reachable from cookie-net, and is gone from 0.7.1, which requires crypt-io 1.2.2 (dev/PLAN.md D-078, D-081).
 - `#![forbid(unsafe_code)]`. Library code cannot panic by construction: clippy denies `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, `dbg!`, and print macros outside tests, and CI runs clippy with warnings as errors. Indexing is bounds-checked by the language; fuzzing finds no panic.
 - A one-hour jar soak (`tests/soak.rs`) streams random `Set-Cookie` lines for 500 hosts with export and import and checks that resident memory stays flat.
 

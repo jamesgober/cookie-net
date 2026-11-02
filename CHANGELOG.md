@@ -13,6 +13,20 @@
 
 ---
 
+## [0.7.1] - 2026-11-02
+
+Dependency floor. No API or format change.
+
+### Changed
+
+- Requires crypt-io 1.2.2 (was 1.1). crypt-io now builds HMAC and HKDF itself,
+  so `ctutils` and RUSTSEC-2026-0385 leave the dependency tree on every
+  toolchain, including Rust 1.85 and 1.86. Output is byte-identical; the
+  pinned format vectors pass unchanged.
+- CI audits both the MSRV resolution and the newest resolution.
+
+---
+
 ## [0.7.0] - 2026-10-25
 
 Hardening: every threat proven by a test, every parser fuzzed for a day.
@@ -240,7 +254,8 @@ The scaffold and the plan. No functional code yet.
 - `dev/PLAN.md` (purpose, scope, architecture, threats, ecosystem, open
   decisions, decision log), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 
-[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/jamesgober/cookie-net/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/jamesgober/cookie-net/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jamesgober/cookie-net/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/jamesgober/cookie-net/compare/v0.4.0...v0.5.0
