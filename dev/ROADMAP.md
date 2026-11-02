@@ -10,7 +10,7 @@
 | Needed | For | State (2026-10-22) |
 |---|---|---|
 | parse-net 0.6 (published) | 0.3: byte classes, `find_byte`, `HttpDate`, host syntax, `Sink` | published, 0.6.1 |
-| crypt-io 1.1 (published) | 0.4: keyed BLAKE3, `Tag<16>`, HKDF, XChaCha20-Poly1305 | published, 1.1.0 |
+| crypt-io 1.2 (published) | 0.4: keyed BLAKE3, `Tag<16>`, HKDF, XChaCha20-Poly1305 | published; 1.2.2 required from 0.7.1 (D-081) |
 | encode-lib | 0.4: base64url | not published; the private interim module is used (PLAN D-008) |
 | url-lib | 0.5: optional, the jar takes URL parts | not needed |
 
@@ -83,8 +83,15 @@ Exit: each comparable row is at least 20% faster than the best competitor, or ha
 
 Exit: no open finding; every threat proven by a test. **Met 2026-10-25.**
 
+## v0.7.1 - Dependency floor
+
+- [x] Require crypt-io 1.2.2, which removes `ctutils` from the tree for every toolchain; audit both the MSRV and the newest resolution in CI (D-081).
+
+Exit: `cargo audit` clean on both resolutions. **Met 2026-11-02.**
+
 ## v0.8.0 - Alpha
 
+- [ ] Move to the current parse-net (0.8 at the time of writing). `Sink` and `Full` are in cookie-net's public API, so this is a breaking change and belongs in a 0.x minor, not a patch (D-082). All tests and clippy already pass on parse-net 0.8.
 - [ ] gate-net and the WASP gate owners confirm the session helpers (moved from 0.2).
 - [ ] The WASP gateway credential locator and the gates (login, logout, elevation, rolling tokens) built on cookie-net in a local build; web-net preferences and flash messages on `Signer` and `Sealer`.
 
@@ -103,7 +110,6 @@ After the beta and before any 1.0 release candidate (D-080). Nothing accepted du
 - [ ] **Revisit every accepted gap, deferred item, known issue, and missed target.** Each is fixed, or kept with its reason restated and checked against the current state of the crates it depends on. The list as of 0.7.0:
   - Sealing (rows C8, C9) about 4 times slower than AES-256-GCM, waiting on XAES-256-GCM in crypt-io (D-073, the "Moved, with reason" note under 0.6).
   - T26, a failing random source while sealing: documented, not tested, waiting on a crypt-io hook (PLAN 13.2).
-  - RUSTSEC-2026-0385: builds on Rust 1.85 and 1.86 still resolve `ctutils` 0.4.2 (unreachable from cookie-net; D-078). Recheck the advisory, crypt-io's fix, and the MSRV.
   - `signed` needs an allocator because crypt-io's MAC and KDF paths do (D-033).
   - The private base64url copy, until encode-lib is published (D-008).
   - error-core codes behind a feature, once error-core is published (D-027).
