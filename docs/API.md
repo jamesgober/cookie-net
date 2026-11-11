@@ -18,7 +18,7 @@
 </div>
 <br>
 
-A task-oriented tour of the 0.8 API. The rustdoc on
+A task-oriented tour of the 0.9 API. The rustdoc on
 [docs.rs](https://docs.rs/cookie-net) is the exhaustive reference; every
 example here is compiled and run as a doctest with all features enabled.
 Examples write `use cookie_net as cookie;` and call `cookie::get(..)`.
@@ -68,6 +68,7 @@ Examples write `use cookie_net as cookie;` and call `cookie::get(..)`.
   - [`CookieError`](#cookieerror)
   - [`Ambiguous`](#ambiguous)
 - [Thread safety and sizes](#thread-safety-and-sizes)
+- [Migrating from 0.8](#migrating-from-08)
 - [Migrating from 0.7](#migrating-from-07)
 - [Examples in the repository](#examples-in-the-repository)
 
@@ -75,13 +76,13 @@ Examples write `use cookie_net as cookie;` and call `cookie::get(..)`.
 
 ```toml
 [dependencies]
-cookie-net = "0.8"
+cookie-net = "0.9"
 # signed and encrypted cookies:
-# cookie-net = { version = "0.8", features = ["signed", "encrypted"] }
+# cookie-net = { version = "0.9", features = ["signed", "encrypted"] }
 # an outbound client:
-# cookie-net = { version = "0.8", features = ["jar"] }
+# cookie-net = { version = "0.9", features = ["jar"] }
 # no_std, no allocator:
-# cookie-net = { version = "0.8", default-features = false }
+# cookie-net = { version = "0.9", default-features = false }
 ```
 
 ### Features
@@ -364,14 +365,15 @@ assert_eq!(cookies.iter().count(), 2);
 
 ### How a header is read
 
-The grammar is rfc6265bis section 4.2.1, `cookie-pair *( ";" SP cookie-pair )`. For each line:
+The grammar is rfc6265bis section 4.2.1, `cookie-pair *( ";" SP cookie-pair )`, where `cookie-pair` allows spaces and tabs around `=`. For each line:
 
 ```text
  0 total length > max_header_len                ─▶ too long: nothing read
  1 skip spaces and tabs
  2 find the next ';'                            ─▶ the pair is the bytes before it
  3 trim spaces and tabs at the end; an empty pair is counted in `empty`
- 4 split at the first '='; no '='               ─▶ skipped (a nameless cookie)
+ 4 split at the first '='; no '='               ─▶ skipped (a nameless cookie);
+   spaces and tabs before and after '=' are dropped
  5 name: 1 to max_name_len bytes, every byte a token character, else skipped
  6 value: strict or lenient as above; longer than max_value_len, or
           name + value > 4096                   ─▶ skipped
@@ -831,7 +833,8 @@ Feature `client`. For outbound HTTP clients, which must treat cookies as a brows
 | `path` | `None` also when the value does not start with `/` |
 | `secure`, `http_only`, `partitioned` | the flags |
 | `same_site` | `Option<SameSite>`; `None` when absent or unknown, which a jar treats as `Lax` |
-| `unknown_attributes` | how many attributes were not recognised |
+| `has_path` | a `Path` attribute was present, even one whose value fell back to the default path |
+| `unknown_attributes` | how many attributes were not recognised (empty segments such as `;;` are not counted) |
 
 ```rust
 use cookie_net::{SameSite, parse_set_cookie};
@@ -871,18 +874,20 @@ Feature `jar`. A bounded store that follows the rfc6265bis storage (section 5.7)
 | `Jar::with_public_suffix(list)` | with your [public suffix list](#public-suffixes) |
 | `Jar::with_store(list, store)` | with your list and your [store](#storage-export-and-import) |
 | `.with_limits(JarLimits)` | other [limits](#jarlimits) |
-| `.store(&url, set_cookie_line, now)` | applies one `Set-Cookie` line; returns a [`StoreOutcome`](#storeoutcome-and-ignorereason) |
+| `.store(&url, set_cookie_line, now)` | applies one `Set-Cookie` line from a same-site request; returns a [`StoreOutcome`](#storeoutcome-and-ignorereason) |
+| `.store_for(&url, &context, set_cookie_line, now)` | the same for a cross-site or embedded request |
 | `.store_all(&url, lines, now)` | every line of a response; returns how many were stored |
-| `.cookie_header(&url, now)` | the `Cookie` header for a request, or `None` when no cookie applies |
+| `.cookie_header(&url, now)` | the `Cookie` header for a request, or `None` when no cookie applies; a cookie whose name or value is not UTF-8 is left out of this `String` form |
 | `.cookie_header_for(&url, &context, now)` | the same for a cross-site or navigation request |
-| `.write_cookie_header(&url, &context, now, &mut sink)` | the same bytes into a `Sink`; returns how many cookies it holds |
+| `.write_cookie_header(&url, &context, now, &mut sink)` | every applicable cookie's bytes into a `Sink`; returns how many cookies it holds |
 | `.remove_expired(now)`, `.clear()`, `.clear_domain(domain)` | removal; the first and last return how many went |
 | `.len()`, `.is_empty()`, `.cookies()` | what the jar holds |
 | `.export()`, `.import(&bytes, now)` | move a jar between processes or nodes |
 
-- `store` applies the storage steps that apply to a client: a `Secure` cookie only from a secure origin; a non-secure origin can neither overwrite nor shadow a `Secure` cookie; `Domain` must domain-match the host and pass the public suffix check; the `__Host-` and `__Secure-` rules; `SameSite=None` and `Partitioned` need `Secure`; a nameless cookie whose value starts with a prefix is ignored; replacing a cookie keeps its creation time; expiry is capped at 400 days.
-- `cookie_header` picks host-only or domain-matching cookies, path-matching, `Secure` only over secure channels, `SameSite` against the context; longer paths first, then earlier creation; `"; "` between pairs. It updates last-access times.
-- Partitioned cookies are kept under the request host as their partition key and sent only when the context's top-level site matches.
+- `store` applies the storage steps that apply to a client: a `Secure` cookie only from a secure origin; a non-secure origin can neither overwrite nor shadow a `Secure` cookie; `Domain` must domain-match the host and pass the public suffix check (an empty `Domain`, as in `Domain=.`, makes a host-only cookie, and an IP-address host only ever gets host-only cookies); the `__Host-` rules (`Secure`, host-only, a `Path` attribute, and a path of `/`, also when an invalid `Path` value fell back to the default path `/`) and the `__Secure-` rule; `SameSite=None` and `Partitioned` need `Secure`; a nameless cookie whose value starts with a prefix is ignored; replacing a cookie keeps its creation time; expiry is capped at 400 days; expired cookies are removed first, so they never block or donate.
+- `store_for` adds the request context: a cross-site response's cookie is ignored unless it is `SameSite=None` or the request was a top-level navigation (section 5.7 step 18), and a partitioned cookie is kept under the context's top-level site.
+- `cookie_header` picks host-only or domain-matching cookies, path-matching, `Secure` only over secure channels, `SameSite` against the context; longer paths first, then earlier creation (also after an import); `"; "` between pairs. It updates last-access times of the cookies it sends.
+- Partitioned cookies are kept under the top-level site of the request that set them (the request host when the context names none) and sent only when the context's top-level site matches.
 - Memory is bounded by the limits, never by input: over a limit, expired cookies go first, then the least recently used non-secure cookie, then the least recently used secure one (rfc6265bis section 5.7), so a plain-HTTP origin cannot evict a `Secure` cookie by flooding a domain. `Debug` shows counts and limits, never values.
 
 ```rust
@@ -926,6 +931,27 @@ let link = RequestContext::cross_site().navigation(true);
 assert_eq!(jar.cookie_header_for(&url, &link, now).as_deref(), Some("lax=1"));
 assert_eq!(jar.cookie_header_for(&url, &RequestContext::cross_site(), now), None);
 assert_eq!(jar.cookie_header(&url, now).as_deref(), Some("strict=1; lax=1"));
+```
+
+A client that knows a response came from an embedded or cross-site request stores its cookies with `store_for`:
+
+```rust
+use cookie_net::{IgnoreReason, Jar, RequestContext, RequestUrl, StoreOutcome};
+
+let now = 1_800_000_000;
+let mut jar = Jar::new();
+let widget = RequestUrl::https("widget.example", "/");
+let embedded = RequestContext::cross_site().top_level_site("shop.example");
+assert_eq!(
+    jar.store_for(&widget, &embedded, "pref=1; Secure", now),
+    StoreOutcome::Ignored(IgnoreReason::CrossSite)
+);
+assert_eq!(
+    jar.store_for(&widget, &embedded, "t=1; Secure; SameSite=None; Partitioned", now),
+    StoreOutcome::Stored
+);
+assert_eq!(jar.cookie_header_for(&widget, &embedded, now).as_deref(), Some("t=1"));
+assert_eq!(jar.cookie_header(&widget, now), None);       // another partition
 ```
 
 ### Public suffixes
@@ -981,6 +1007,8 @@ assert_eq!(jar.len(), 2);                                // the least recently u
 | `HostPrefix`, `SecurePrefix` | the prefix rules |
 | `SameSiteNoneNeedsSecure`, `PartitionedNeedsSecure` | `Secure` is missing |
 | `Expired` | already expired, and nothing stored to remove |
+| `CrossSite` | a cross-site response's cookie that is not `SameSite=None`, outside a top-level navigation (`store_for`) |
+| `InvalidRequestUrl` | the host or top-level site is empty or not printable ASCII, or the cookie path is over 1024 bytes or holds a control character |
 
 ```rust
 use cookie_net::{IgnoreReason, Jar, RequestUrl, StoreOutcome};
@@ -1002,7 +1030,7 @@ assert_eq!(
 
 State lives behind the `JarStore` trait, so a jar can keep its cookies in memory (`MemoryStore`, the default), on disk, or in a shared store. A store only holds and indexes `StoredCookie`s (`len`, `get`, `get_mut`, `push`, `swap_remove`, `clear`); the jar applies every rule and every bound, so a store cannot weaken them. A durable store writes through on `push` and `swap_remove`.
 
-`export` writes the cookies in a versioned format with a BLAKE3 checksum ([`FORMATS.md`](./FORMATS.md#jar-export-format-v1)). `import` treats the bytes as untrusted input: the checksum catches corruption, every field is validated again, cookies already expired at `now` are skipped, and the jar's limits apply. Any problem returns `InvalidJarData` and imports nothing. Exported bytes hold cookie values, so treat them as secrets.
+`export` writes the cookies in a versioned format with a BLAKE3 checksum ([`FORMATS.md`](./FORMATS.md#jar-export-format-v1)). `import` treats the bytes as untrusted input, because the checksum is not a MAC: every field is validated again, and a record that no `store` could have made (a `__Host-` cookie that is not host-only, say) fails the import with `InvalidJarData`, importing nothing. Records expired at `now`, and domain cookies this jar's suffix list refuses, are skipped. An imported cookie replaces a stored one with the same identity, keeping its creation time; times later than `now` come back to `now`, expiries are capped at 400 days, and the jar's limits apply once, in the eviction order. An import costs `n log n` and rewrites the store. Exported bytes hold cookie values, so treat them as secrets.
 
 ```rust
 use cookie_net::{Jar, RequestUrl};
@@ -1094,6 +1122,18 @@ assert_eq!(CookieError::from(Ambiguous::Truncated).code(), "ambiguous.truncated"
 | `Jar` | yes | changes through `&mut self`; no internal locking |
 
 Every row is checked by a test. Sizes on 64-bit targets: `Pair` 32 bytes, `Cookies` 48, `Lookup` 24, `Located` 40, `Stats` 12, `Limits` 16, `SetCookie` 232 (eight extension slots), `SetCookieBuilder` 256.
+
+## Migrating from 0.8
+
+0.9 adds to the API and changes no signature. A `match` on `IgnoreReason` already needs a wildcard arm (the enum is `#[non_exhaustive]`), so the two new reasons need no change.
+
+| 0.8 behaviour | 0.9 |
+|---|---|
+| `Jar::store` treated every response as same-site | `store` still does; `store_for(&url, &context, line, now)` takes the context, refusing cross-site cookies (`IgnoreReason::CrossSite`) and keying partitioned cookies by the top-level site |
+| `cookie_header` returned `None` when one cookie was not UTF-8 | it leaves that cookie out; `write_cookie_header` writes every cookie's bytes |
+| `import` added cookies as they came | it replaces by identity, checks every record against the storage rules, and applies the limits once |
+| a cookie whose default path was over 1024 bytes was stored, and broke `export` | `IgnoreReason::InvalidRequestUrl` |
+| `a =1` in a `Cookie` header was skipped | it is the pair `a` = `1` |
 
 ## Migrating from 0.7
 

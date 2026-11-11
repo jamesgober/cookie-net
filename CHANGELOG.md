@@ -13,6 +13,45 @@
 
 ---
 
+## [0.9.0] - 2026-11-11
+
+Beta: every finding of the adversarial review fixed, each with a test that
+failed before its fix (`tests/review_09.rs`).
+
+### Added
+
+- `Jar::store_for`: storing with a request context. A cross-site response's
+  cookie is ignored unless it is `SameSite=None` or the request was a
+  top-level navigation (rfc6265bis section 5.7 step 18), and a partitioned
+  cookie is kept under the context's top-level site.
+- `IgnoreReason::CrossSite` and `IgnoreReason::InvalidRequestUrl`.
+- `SetCookieView::has_path`.
+
+### Fixed
+
+- `Jar::cookie_header` returned `None` for the whole request when one stored
+  cookie was not UTF-8; it now leaves that cookie out.
+- `Jar::import` added duplicates, did not check records against the storage
+  rules, kept times from the file, and cost records times jar size. It now
+  replaces by identity, refuses records no jar could have stored, skips
+  domain cookies its suffix list refuses, caps times, and applies the limits
+  once in `n log n`.
+- A default path over 1024 bytes, or with a control character, made the
+  whole export unimportable; such cookies are refused when storing, and a
+  path with `;` round-trips.
+- An IP-address host could get a domain cookie with a suffix list;
+  `Domain=.` was ignored instead of host-only; expired cookies blocked a
+  replacement or gave it their creation time; cookies of equal path length
+  went by insertion, not creation; a `__Host-` cookie whose `Path` fell back
+  to `/` was refused.
+- The `Cookie` parser skipped pairs with spaces or tabs around `=`, which
+  rfc6265bis allows.
+- `SetCookieView::unknown_attributes` counted empty segments.
+- `Sealer` built a cookie over 4096 bytes for names over 4035 bytes, and
+  `sealed_len` could overflow.
+
+---
+
 ## [0.8.0] - 2026-11-11
 
 Alpha: a simpler API, parse-net 0.9, and documentation that runs.
@@ -291,7 +330,8 @@ The scaffold and the plan. No functional code yet.
 - `dev/PLAN.md` (purpose, scope, architecture, threats, ecosystem, open
   decisions, decision log), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 
-[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/jamesgober/cookie-net/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/jamesgober/cookie-net/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/jamesgober/cookie-net/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/jamesgober/cookie-net/compare/v0.6.0...v0.7.0

@@ -115,10 +115,13 @@ Exit: the end-to-end WASP login flow is green with cookie-net; csrf-sec's expect
 
 ## v0.9.0 - Beta
 
-- [ ] Every finding of the adversarial review (three independent reviews at 0.8: standards conformance, attacks, edge cases) fixed test-first; the list is under 0.8 above (D-086).
-- [ ] gate-net and web-net use it end to end (DIRECTIVES definition of done, item 10); fetch-net uses the jar if it exists by then; API frozen except fixes.
+- [x] Every finding of the adversarial review (three independent reviews at 0.8: standards conformance, attacks, edge cases) fixed test-first: each has a regression test in `tests/review_09.rs` that failed on 0.8.0 (D-086, D-087).
+- [x] The consumers use it end to end: web-net 0.9 (`get_unique`, `SetCookie`) and gatekeeper-io (the WASP gates' sign-in, sign-out, and elevation through `session_cookie`, `SetCookie::delete`, `get_unique`), whose suites pass on cookie-net 0.8 (D-085). fetch-net does not exist yet, so the jar has no consumer.
+- [x] API frozen except fixes: 0.9 adds `Jar::store_for`, two `IgnoreReason` variants, and `SetCookieView::has_path`, all needed by review fixes (D-087).
 
-Exit: an adversarial review with every finding fixed test-first.
+Exit: an adversarial review with every finding fixed test-first. **Met 2026-11-11.**
+
+**Moved, with reason:** web-net preferences and flash messages on `Signer` and `Sealer` stay with web-net; cookie-net is ready for them and cannot build them for it.
 
 ## v0.9.x - Pre-1.0 polish
 

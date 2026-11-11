@@ -77,16 +77,16 @@
 
 ```toml
 [dependencies]
-cookie-net = "0.8"
+cookie-net = "0.9"
 
 # signed and encrypted cookies:
-cookie-net = { version = "0.8", features = ["signed", "encrypted"] }
+cookie-net = { version = "0.9", features = ["signed", "encrypted"] }
 
 # an outbound client:
-cookie-net = { version = "0.8", features = ["jar"] }
+cookie-net = { version = "0.9", features = ["jar"] }
 
 # no_std, no allocator:
-cookie-net = { version = "0.8", default-features = false }
+cookie-net = { version = "0.9", default-features = false }
 ```
 
 | Feature | Default | Adds |
@@ -203,7 +203,7 @@ Measured against `cookie`, `biscotti`, and `cookie_store` on the same bytes ([`d
 | jar `Cookie` header | 56% |
 | sealing, opening | about 4 times **slower** than AES-256-GCM: the cipher; XAES-256-GCM is planned |
 
-## Status: alpha (`0.8.0`)
+## Status: beta (`0.9.0`)
 
 **Done:** the request side, the response side, the session helpers (0.3); signed and encrypted cookies with key rings, staged rotation, fingerprints, expiry, and session binding (0.4); the client parser, the cookie-date algorithm, the cookie jar with a store trait and export, and `Clear-Site-Data` for cookie-bomb recovery (0.5). Each rule tested with its source; property, counting-allocator, complexity, and attack tests; test vectors; nine fuzz targets.
 
@@ -213,7 +213,9 @@ Measured against `cookie`, `biscotti`, and `cookie_store` on the same bytes ([`d
 
 **0.8:** a simpler API (one way to read a header, one `SameSite` type), parse-net 0.9, and an API reference whose examples run as tests. web-net and the WASP gates (gatekeeper-io) pass their test suites on it. Moving from 0.7 is in [`docs/API.md`](./docs/API.md#migrating-from-07).
 
-**Next:** `0.9` beta: an adversarial review with every finding fixed test-first, then the pre-1.0 polish pass. The schedule is in [`dev/ROADMAP.md`](./dev/ROADMAP.md).
+**0.9:** three independent reviews (standards, attacks, edge cases) found 20 defects, almost all in the client jar; every one is fixed with a test that failed before its fix. The jar gained `store_for` for cross-site and embedded responses.
+
+**Next:** the pre-1.0 polish pass: every accepted gap revisited, a fresh performance pass, the security review again, and a readiness note for 1.0. The schedule is in [`dev/ROADMAP.md`](./dev/ROADMAP.md).
 
 **API stability:** the API was locked at `0.2.0`; names change only with a recorded decision in [`dev/PLAN.md`](./dev/PLAN.md). Measured performance is in [`docs/PERFORMANCE.md`](./docs/PERFORMANCE.md).
 

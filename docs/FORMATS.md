@@ -112,5 +112,10 @@ same-site = 0 default | 1 Strict | 2 Lax | 3 None
 ```
 
 - Records are in creation order, so an import sends cookies in the same order.
-- The checksum detects corruption; it is not a MAC. `import` checks every field as untrusted input: magic, version, count (at most 1,000,000), lengths, name plus value at most 4096 bytes, no control bytes or `;` in name, value, and path, a path starting with `/`, a lowercase ASCII domain and partition, the partitioned flag matching a partition key, and no bytes left over. Any failure imports nothing (`InvalidJarData`).
+- The checksum detects corruption; it is not a MAC, so anyone who can edit the bytes can recompute it. `import` therefore checks everything as untrusted input:
+  - the format: magic, version, count (at most 1,000,000), lengths, and no bytes left over;
+  - every field: name plus value at most 4096 bytes with no control byte or `;`; a path starting with `/`, at most 1024 bytes, with no control byte (`;` is allowed: a default path from a URL can hold one); a domain and partition of 1 to 255 lowercase printable ASCII bytes; the partitioned flag matching a partition key;
+  - every record against the storage rules no jar can break: a `__Host-` cookie is host-only, `Secure`, and `Path=/`; a `__Secure-` cookie is `Secure`; `SameSite=None` and partitioned cookies are `Secure`; a nameless cookie's value does not start with a prefix.
+
+  Any failure imports nothing (`InvalidJarData`). Records that are valid but do not fit the importing jar are skipped: expired at `now`, or a domain cookie for an IP address or a public suffix of the jar's list. Times later than `now` are brought back to `now`, and expiries are capped at 400 days, so a file cannot make a cookie the last to be evicted or outlive the cap.
 - The bytes hold cookie values, which may be session tokens: store them as secrets.
