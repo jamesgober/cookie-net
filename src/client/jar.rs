@@ -10,8 +10,8 @@ use core::{fmt, net::Ipv4Addr};
 
 use parse_net::Sink;
 
-use super::set_cookie::{SameSiteAttr, Text, parse_set_cookie};
-use crate::{MAX_LIFETIME, error::CookieError, request::Len};
+use super::set_cookie::{Text, parse_set_cookie};
+use crate::{MAX_LIFETIME, SameSite, error::CookieError, request::Len};
 
 /// Decides which domains are public suffixes (`co.uk`, `github.io`), where no
 /// site may set a cookie for others.
@@ -348,8 +348,9 @@ pub struct StoredCookie {
     pub secure: bool,
     /// Not exposed to scripts (always sent by this HTTP-only jar).
     pub http_only: bool,
-    /// The `SameSite` attribute.
-    pub same_site: SameSiteAttr,
+    /// The `SameSite` attribute; `None` when the server sent none (or an
+    /// unknown value), which the jar treats as `Lax`.
+    pub same_site: Option<SameSite>,
     /// The partition key (top-level site) of a partitioned cookie.
     pub partition: Option<String>,
     /// Creation order, for sorting cookies created in the same second.
@@ -610,7 +611,7 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
         if v.secure && !url.secure {
             return StoreOutcome::Ignored(IgnoreReason::SecureFromInsecure);
         }
-        if v.same_site == SameSiteAttr::None && !v.secure {
+        if v.same_site == Some(SameSite::None) && !v.secure {
             return StoreOutcome::Ignored(IgnoreReason::SameSiteNoneNeedsSecure);
         }
         if v.partitioned && !v.secure {
@@ -799,8 +800,8 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
                         && (!c.secure || url.secure)
                         && (cx.same_site
                             || match c.same_site {
-                                SameSiteAttr::None => true,
-                                SameSiteAttr::Strict => false,
+                                Some(SameSite::None) => true,
+                                Some(SameSite::Strict) => false,
                                 _ => cx.navigation && cx.safe_method,
                             })
                         && c.partition.as_ref().is_none_or(|p| *p == site)
@@ -1102,8 +1103,8 @@ mod export {
 
     use crypt_io::hash::blake3;
 
-    use super::{SameSiteAttr, StoredCookie};
-    use crate::{error::CookieError, limits::PAIR_MAX};
+    use super::StoredCookie;
+    use crate::{SameSite, error::CookieError, limits::PAIR_MAX};
 
     const MAGIC: &[u8; 4] = b"CNJR";
     const VERSION: u8 = 1;
@@ -1122,10 +1123,10 @@ mod export {
                 | (u8::from(c.partition.is_some()) << 4);
             out.push(flags);
             out.push(match c.same_site {
-                SameSiteAttr::Strict => 1,
-                SameSiteAttr::Lax => 2,
-                SameSiteAttr::None => 3,
-                SameSiteAttr::Default => 0,
+                Some(SameSite::Strict) => 1,
+                Some(SameSite::Lax) => 2,
+                Some(SameSite::None) => 3,
+                None => 0,
             });
             for t in [c.expiry.unwrap_or(0), c.creation, c.last_access] {
                 out.extend_from_slice(&t.to_be_bytes());
@@ -1215,10 +1216,10 @@ mod export {
         for _ in 0..n {
             let flags = r.byte()?;
             let same_site = match r.byte()? {
-                0 => SameSiteAttr::Default,
-                1 => SameSiteAttr::Strict,
-                2 => SameSiteAttr::Lax,
-                3 => SameSiteAttr::None,
+                0 => None,
+                1 => Some(SameSite::Strict),
+                2 => Some(SameSite::Lax),
+                3 => Some(SameSite::None),
                 _ => return Err(CookieError::InvalidJarData),
             };
             let (expiry, creation, last_access) = (r.u64()?, r.u64()?, r.u64()?);

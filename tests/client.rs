@@ -6,7 +6,7 @@
 
 use cookie_net::{
     self as cookie, IgnoreReason, Jar, JarLimits, Limits, RequestContext, RequestUrl, SameSite,
-    SameSiteAttr, SetCookie, StoreOutcome, ValueMode, parse_set_cookie,
+    SetCookie, StoreOutcome, ValueMode, parse_set_cookie,
 };
 use proptest::prelude::*;
 
@@ -51,8 +51,7 @@ proptest! {
         prop_assert_eq!(v.max_age, c.max_age().map(|m| i64::try_from(m).unwrap()));
         prop_assert_eq!(v.expires, c.expires().map(|e| i64::try_from(e).unwrap()));
         prop_assert_eq!((v.secure, v.http_only, v.partitioned), (c.is_secure(), c.is_http_only(), c.is_partitioned()));
-        let same_site = match c.same_site() { SameSite::Strict => SameSiteAttr::Strict, SameSite::Lax => SameSiteAttr::Lax, _ => SameSiteAttr::None };
-        prop_assert_eq!(v.same_site, same_site);
+        prop_assert_eq!(v.same_site, Some(c.same_site()));
     }
 
     /// Whatever the jar stores, the Cookie header it writes reads back, pair

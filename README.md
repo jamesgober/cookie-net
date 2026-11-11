@@ -91,7 +91,7 @@ cookie-net = { version = "0.7", default-features = false }
 
 | Feature | Default | Adds |
 |---|---|---|
-| `std` | yes | implies `alloc`; the clock-reading helpers of later versions |
+| `std` | yes | implies `alloc`; `verify_now` and `open_now`, which read the system clock |
 | `alloc` | through `std` | `SetCookie::encode`, `String`-returning signing |
 | `signed` | no | `Key`, `KeyRing`, `Signer` (crypt-io; works without `std` given an allocator) |
 | `encrypted` | no | `Sealer`; implies `signed` and `std` |
@@ -113,6 +113,8 @@ let theme = cookie::get(header, "theme").unwrap_or("light");
 // Writing
 let set = SetCookie::new("theme", "dark")?;                   // Secure; HttpOnly; SameSite=Lax; Path=/
 assert_eq!(set.encode(), "theme=dark; Path=/; Secure; HttpOnly; SameSite=Lax");
+# let _ = (sid, theme);
+# Ok::<(), cookie_net::CookieError>(())
 ```
 
 ### **Sessions**
@@ -126,6 +128,8 @@ let login = cookie::session_cookie("__Host-sid", token, 12 * cookie::HOUR)?;
 
 let sudo = cookie::elevated_cookie("__Host-sudo", token, 10 * cookie::MINUTE)?;   // SameSite=Strict
 let logout = SetCookie::delete("__Host-sid")?;                // revoke on the server first
+# let _ = (login, sudo, logout);
+# Ok::<(), cookie_net::CookieError>(())
 ```
 
 ### **The credential locator**
@@ -145,13 +149,16 @@ assert_eq!(found.severity_hint(), 5);
 use cookie_net::{self as cookie, Sealer, Signer};
 
 let now = 1_800_000_000;
-let signer = Signer::new(signing_key)?;                       // [u8; 32] from key-vault
+let signing_key = *b"an example key, 32 bytes long!!!";      // [u8; 32] from key-vault
+let sealing_key = *b"another example key, 32 bytes!!!";
+let signer = Signer::new(signing_key)?;
 let v = signer.sign_until("plan_banner", "dismissed", now + 30 * cookie::DAY)?;
 assert_eq!(signer.verify("plan_banner", &v, now)?, "dismissed");
 
 let sealer = Sealer::new(sealing_key)?;
 let flash = sealer.seal_until("flash", "Payment received.", now + 60)?;
 assert_eq!(sealer.open("flash", &flash, now)?.as_str(), Some("Payment received."));
+# Ok::<(), cookie_net::CookieError>(())
 ```
 
 ### **An outbound client**
@@ -159,10 +166,12 @@ assert_eq!(sealer.open("flash", &flash, now)?.as_str(), Some("Payment received."
 ```rust
 use cookie_net::{Jar, RequestUrl};
 
+let now = 1_800_000_000;
 let mut jar = Jar::new();
 let url = RequestUrl::https("api.example.com", "/oauth/token");
 jar.store(&url, "sid=abc; Path=/; Secure; HttpOnly", now);
-let header = jar.cookie_header(&RequestUrl::https("api.example.com", "/v1/orders"), now);   // Some("sid=abc")
+let header = jar.cookie_header(&RequestUrl::https("api.example.com", "/v1/orders"), now);
+assert_eq!(header.as_deref(), Some("sid=abc"));
 ```
 
 ### **Rules that cannot be broken**

@@ -3,7 +3,7 @@
 # =============================================================================
 [package]
 name    = "cookie-net"
-version = "0.7.1"
+version = "0.8.0"
 
 # Minimum Supported Rust Version (MSRV)
 rust-version = "1.85"
@@ -78,7 +78,7 @@ jar = ["client", "alloc", "dep:crypt-io", "crypt-io/hash-blake3"]
 # The shared HTTP grammar: byte classes, `find_byte`, `HttpDate`, and the
 # `Sink` writers (dev/PLAN.md section 2). First party, zero dependencies,
 # published; never a path dependency.
-parse-net = { version = "0.6.1", default-features = false }
+parse-net = { version = "0.9.3", default-features = false }
 # Audited cryptography, the one recorded exception to the zero third-party
 # dependency rule (dev/PLAN.md section 8). Only behind `signed` and
 # `encrypted`, with crypt-io's defaults off.

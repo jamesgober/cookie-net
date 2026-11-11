@@ -1,5 +1,5 @@
 //! Parsing `Set-Cookie` as a user agent does (rfc6265bis section 5.6):
-//! [`parse_set_cookie`], [`SetCookieView`], [`SameSiteAttr`].
+//! [`parse_set_cookie`] and [`SetCookieView`].
 //!
 //! A client must behave like a browser, so this follows the user-agent
 //! algorithm, which is more lenient than the server grammar on purpose. Names
@@ -8,34 +8,10 @@
 use core::fmt;
 
 use super::date::cookie_date;
-use crate::{MAX_LIFETIME, limits::PAIR_MAX, request::Len};
+use crate::{MAX_LIFETIME, SameSite, limits::PAIR_MAX, request::Len};
 
 /// The longest attribute value user agents keep (rfc6265bis section 5.6).
 const MAX_ATTRIBUTE: usize = 1024;
-
-/// The `SameSite` attribute as a user agent reads it.
-///
-/// # Examples
-///
-/// ```
-/// use cookie_net::{SameSiteAttr, parse_set_cookie};
-///
-/// assert_eq!(parse_set_cookie("a=1; SameSite=lax").unwrap().same_site, SameSiteAttr::Lax);
-/// assert_eq!(parse_set_cookie("a=1; SameSite=Bogus").unwrap().same_site, SameSiteAttr::Default);
-/// ```
-#[non_exhaustive]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
-pub enum SameSiteAttr {
-    /// `Strict`.
-    Strict,
-    /// `Lax`.
-    Lax,
-    /// `None`.
-    None,
-    /// Absent or an unknown value; a jar treats it as `Lax` (section 5.6.7).
-    #[default]
-    Default,
-}
 
 /// One `Set-Cookie` line as a user agent reads it.
 ///
@@ -67,8 +43,10 @@ pub struct SetCookieView<'a> {
     pub secure: bool,
     /// `HttpOnly`.
     pub http_only: bool,
-    /// `SameSite`.
-    pub same_site: SameSiteAttr,
+    /// `SameSite`; `None` when the attribute is absent or its value is not
+    /// `Strict`, `Lax`, or `None` (a jar then treats the cookie as `Lax`,
+    /// section 5.6.7).
+    pub same_site: Option<SameSite>,
     /// `Partitioned` (CHIPS).
     pub partitioned: bool,
     /// Attributes not recognised, saturating at 255.
@@ -111,14 +89,15 @@ impl fmt::Debug for Text<'_> {
 /// # Examples
 ///
 /// ```
-/// use cookie_net::{SameSiteAttr, parse_set_cookie};
+/// use cookie_net::{SameSite, parse_set_cookie};
 ///
 /// let v = parse_set_cookie("id=a3fWa; Max-Age=2592000; Domain=.Example.com; secure; SameSite=lax").unwrap();
 /// assert_eq!((v.name, v.value), (&b"id"[..], &b"a3fWa"[..]));
 /// assert_eq!(v.max_age, Some(2_592_000));
 /// assert_eq!(v.domain, Some(&b"Example.com"[..]));
 /// assert!(v.secure);
-/// assert_eq!(v.same_site, SameSiteAttr::Lax);
+/// assert_eq!(v.same_site, Some(SameSite::Lax));
+/// assert_eq!(parse_set_cookie("a=1; SameSite=Bogus").unwrap().same_site, None);
 /// assert!(parse_set_cookie("a=b\x01c").is_none());
 /// ```
 #[must_use]
@@ -154,7 +133,7 @@ pub fn parse_set_cookie<L: AsRef<[u8]> + ?Sized>(line: &L) -> Option<SetCookieVi
         path: None,
         secure: false,
         http_only: false,
-        same_site: SameSiteAttr::Default,
+        same_site: None,
         partitioned: false,
         unknown_attributes: 0,
     };
@@ -199,13 +178,13 @@ fn apply<'a>(view: &mut SetCookieView<'a>, attr: &[u8], v: &'a [u8]) {
         view.http_only = true;
     } else if is("SameSite") {
         view.same_site = if v.eq_ignore_ascii_case(b"Strict") {
-            SameSiteAttr::Strict
+            Some(SameSite::Strict)
         } else if v.eq_ignore_ascii_case(b"Lax") {
-            SameSiteAttr::Lax
+            Some(SameSite::Lax)
         } else if v.eq_ignore_ascii_case(b"None") {
-            SameSiteAttr::None
+            Some(SameSite::None)
         } else {
-            SameSiteAttr::Default
+            None
         };
     } else if is("Partitioned") {
         view.partitioned = true;
@@ -296,7 +275,7 @@ mod tests {
         assert_eq!(v.max_age, Some(20));
         assert_eq!(v.unknown_attributes, 2);
         let v = p("a=b; SameSite=None; SameSite=Strict");
-        assert_eq!(v.same_site, SameSiteAttr::Strict);
+        assert_eq!(v.same_site, Some(SameSite::Strict));
     }
 
     #[test]
