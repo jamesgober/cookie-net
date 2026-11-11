@@ -346,3 +346,67 @@ fn test_sealer_size_limits_hold_for_long_names() {
     assert_eq!(s.max_plaintext(4050), 0);
     let _ = s.sealed_len(usize::MAX);
 }
+
+// The independent review of 0.7.1 (`_strategy` review F-1 to F-10). F-1,
+// F-2, and F-4 are the import and partition tests above.
+
+/// F-3: the session helpers take the exact `__Host-` prefix only. A
+/// lowercase `__host-` is a `__Host-` cookie to a current browser, but the
+/// server reads names byte for byte, so its own `get_unique("__Host-sid")`
+/// would never see it.
+#[test]
+fn test_session_helpers_need_the_exact_host_prefix() {
+    let token = "Zk3J9qL0wX7aP2mT8sV1cR5dY4hN6bE0uK9gF3jQ2oA";
+    for name in ["__host-sid", "__HOST-sid", "__Host-sid"] {
+        let ok = name.starts_with("__Host-");
+        assert_eq!(
+            cookie::session_cookie(name, token, cookie::HOUR).is_ok(),
+            ok,
+            "{name}"
+        );
+        assert_eq!(
+            cookie::elevated_cookie(name, token, 600).is_ok(),
+            ok,
+            "{name}"
+        );
+    }
+    assert_eq!(
+        cookie::session_cookie("__host-sid", token, cookie::HOUR).unwrap_err(),
+        CookieError::HostPrefix
+    );
+}
+
+/// F-5: `rotated` promotes a staged key only when its bytes are the staged
+/// ones; a switch to other bytes under the staged id is refused, so one node
+/// cannot start signing with a key the others do not hold.
+#[test]
+fn test_key_ring_rotated_checks_the_staged_bytes() {
+    use cookie_net::{KeyId, KeyRing, Signer};
+    let (k1, k2, other) = (
+        *b"an example key, 32 bytes long!!!",
+        *b"the second key, 32 bytes long!!!",
+        *b"not the staged key, 32 bytes!!!!",
+    );
+    let staged = KeyRing::new(KeyId(1), k1).accept(KeyId(2), k2);
+    assert!(Signer::with_ring(staged.clone().rotated(KeyId(2), k2, NOW)).is_ok());
+    assert_eq!(
+        Signer::with_ring(staged.clone().rotated(KeyId(2), other, NOW)).unwrap_err(),
+        CookieError::DuplicateKeyId
+    );
+    assert_eq!(
+        Sealer::with_ring(staged.rotated(KeyId(2), other, NOW)).unwrap_err(),
+        CookieError::DuplicateKeyId
+    );
+}
+
+/// F-6: a ring without a signing key says so.
+#[test]
+fn test_key_ring_without_signing_key_is_reported() {
+    use cookie_net::{KeyId, KeyRing, Signer};
+    let ring = KeyRing::new(KeyId(1), *b"an example key, 32 bytes long!!!").without(KeyId(1));
+    assert_eq!(
+        Signer::with_ring(ring).unwrap_err(),
+        CookieError::NoSigningKey
+    );
+    assert_eq!(CookieError::NoSigningKey.code(), "no_signing_key");
+}

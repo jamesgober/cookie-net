@@ -90,7 +90,8 @@ impl Sealer {
     ///
     /// # Errors
     ///
-    /// `DuplicateKeyId`, `RingFull`, `WeakKey`, `InvalidRetireTime`, `Crypto`.
+    /// `DuplicateKeyId`, `RingFull`, `NoSigningKey`, `WeakKey`,
+    /// `InvalidRetireTime`, `Crypto`.
     ///
     /// # Examples
     ///
@@ -249,7 +250,7 @@ impl Sealer {
             return Err(CookieError::TooLarge);
         }
         let exp = keys::encode_expiry(expires)?;
-        let slot = self.slots.signing().ok_or(CookieError::RingFull)?;
+        let slot = self.slots.signing().ok_or(CookieError::NoSigningKey)?;
         let text_len = self.sealed_len(plaintext.len());
         if out.remaining().is_some_and(|room| room < text_len) {
             return Err(CookieError::Full);

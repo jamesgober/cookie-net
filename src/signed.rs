@@ -92,7 +92,8 @@ impl Signer {
     ///
     /// # Errors
     ///
-    /// `DuplicateKeyId`, `RingFull`, `WeakKey`, `InvalidRetireTime`, `Crypto`.
+    /// `DuplicateKeyId`, `RingFull`, `NoSigningKey`, `WeakKey`,
+    /// `InvalidRetireTime`, `Crypto`.
     ///
     /// # Examples
     ///
@@ -278,7 +279,7 @@ impl Signer {
             return Err(CookieError::TooLarge);
         }
         let exp = keys::encode_expiry(expires)?;
-        let slot = self.slots.signing().ok_or(CookieError::RingFull)?;
+        let slot = self.slots.signing().ok_or(CookieError::NoSigningKey)?;
         if out
             .remaining()
             .is_some_and(|room| room < self.signed_len(v.len()))

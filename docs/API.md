@@ -538,7 +538,7 @@ Session tokens are opaque random values and the server's record is the truth, so
 
 | Error | When |
 |---|---|
-| `HostPrefix` | the name does not start with `__Host-` |
+| `HostPrefix` | the name does not start with exactly `__Host-` (a browser reads `__host-` as the same prefix, but the server reads names byte for byte, so it would never find its own cookie) |
 | `TokenTooShort` | the token is shorter than 22 bytes (128 bits in base64url): a user id or an empty string by mistake |
 | `InvalidValue { at }` | the token is not `cookie-octet`s |
 | `MaxAgeOutOfRange` | `max_age` is outside 1 to `MAX_LIFETIME`; for `elevated_cookie`, outside 60 to 3600 |
@@ -633,11 +633,11 @@ One signing key and up to seven others, each with a `KeyId` (one byte) and a `Ke
 | `KeyRing::new(id, key)` | a ring whose signing key is `key` |
 | `.accept(id, key)` | adds an accepted key |
 | `.retired(id, key, until)` | adds a retired key |
-| `.rotated(id, key, retire_old_at)` | makes `id` the signing key and retires the previous one until `retire_old_at`; an accepted entry with the same id is promoted |
+| `.rotated(id, key, retire_old_at)` | makes `id` the signing key and retires the previous one until `retire_old_at`; an accepted entry with the same id is promoted when its bytes are `key`, and otherwise kept, so `with_ring` refuses the ring with `DuplicateKeyId` |
 | `.without(id)` | removes a key |
 | `.signing_key()` | the signing key's id |
 
-The ring methods never fail, so a ring reads as one chain. `Signer::with_ring` and `Sealer::with_ring` check it and return `DuplicateKeyId`, `RingFull`, `WeakKey`, or `InvalidRetireTime`. `Debug` shows ids and roles, never key bytes. Never reuse a key id while cookies made under the old key may still be presented.
+The ring methods never fail, so a ring reads as one chain. `Signer::with_ring` and `Sealer::with_ring` check it and return `DuplicateKeyId`, `RingFull`, `NoSigningKey`, `WeakKey`, or `InvalidRetireTime`. `Debug` shows ids and roles, never key bytes. Never reuse a key id while cookies made under the old key may still be presented.
 
 `Signer::keys()` and `Sealer::keys()` list every key as a `KeyInfo` (`id()`, `role()`, `fingerprint()`). A `KeyFingerprint` is eight bytes, printed as 16 hex digits, derived from the key's subkey: it helps nobody forge a cookie, but two nodes holding the same key under the same id show the same fingerprint. Compare fingerprints across a cluster to catch a misdeployed ring before it shows up as a wave of `BadTag` refusals.
 
@@ -1030,7 +1030,7 @@ assert_eq!(
 
 State lives behind the `JarStore` trait, so a jar can keep its cookies in memory (`MemoryStore`, the default), on disk, or in a shared store. A store only holds and indexes `StoredCookie`s (`len`, `get`, `get_mut`, `push`, `swap_remove`, `clear`); the jar applies every rule and every bound, so a store cannot weaken them. A durable store writes through on `push` and `swap_remove`.
 
-`export` writes the cookies in a versioned format with a BLAKE3 checksum ([`FORMATS.md`](./FORMATS.md#jar-export-format-v1)). `import` treats the bytes as untrusted input, because the checksum is not a MAC: every field is validated again, and a record that no `store` could have made (a `__Host-` cookie that is not host-only, say) fails the import with `InvalidJarData`, importing nothing. Records expired at `now`, and domain cookies this jar's suffix list refuses, are skipped. An imported cookie replaces a stored one with the same identity, keeping its creation time; times later than `now` come back to `now`, expiries are capped at 400 days, and the jar's limits apply once, in the eviction order. An import costs `n log n` and rewrites the store. Exported bytes hold cookie values, so treat them as secrets.
+`export` writes the cookies in a versioned format with a BLAKE3 checksum ([`FORMATS.md`](./FORMATS.md#jar-export-format-v1)). `import` treats the bytes as untrusted input, because the checksum is not a MAC: every field is validated again, and a record that no `store` could have made (a `__Host-` cookie that is not host-only, say) fails the import with `InvalidJarData`, importing nothing. Records expired at `now`, and domain cookies this jar's suffix list refuses, are skipped. An imported cookie replaces a stored one with the same identity, keeping its creation time; times later than `now` come back to `now`, expiries are capped at 400 days, and the jar's limits apply once, in the eviction order. An import costs `n log n` and rewrites the store. Exported bytes hold cookie values, so treat them as secrets. Their checksum is not a MAC, and the storage rules bound what a forged file can do but not that it can add ordinary cookies: an export is as trustworthy as the place it is kept, so keep it where only the client writes, or authenticate it yourself across a trust boundary.
 
 ```rust
 use cookie_net::{Jar, RequestUrl};
@@ -1081,7 +1081,8 @@ One error type for every fallible call, so `?` works in a handler that returns `
 | `KeyTooShort` | `Key::derive` got a master shorter than 32 bytes | use a longer master |
 | `ContextTooLong` | `Key::derive` got a context over 200 bytes | use a short service name |
 | `DuplicateKeyId` | two keys in a ring share an id | give every key its own id |
-| `RingFull` | a ring holds more than 8 keys, or no signing key | drop retired keys with `without`; keep one signing key |
+| `RingFull` | a ring holds more than 8 keys | drop retired keys with `without` |
+| `NoSigningKey` | a ring has no signing key (all removed with `without`) | keep one signing key |
 | `InvalidRetireTime` | a retire time is after 2156 | pass seconds |
 | `Crypto` | the cryptography failed, such as the random source while sealing; nothing was written | retry; alert if it repeats |
 | `InvalidJarData` | `Jar::import` got bytes with a wrong magic, version, checksum, length, or field; nothing was imported | export again; never edit the bytes |
@@ -1134,6 +1135,9 @@ Every row is checked by a test. Sizes on 64-bit targets: `Pair` 32 bytes, `Cooki
 | `import` added cookies as they came | it replaces by identity, checks every record against the storage rules, and applies the limits once |
 | a cookie whose default path was over 1024 bytes was stored, and broke `export` | `IgnoreReason::InvalidRequestUrl` |
 | `a =1` in a `Cookie` header was skipped | it is the pair `a` = `1` |
+| `session_cookie("__host-sid", ..)` was accepted | `HostPrefix`: the helpers take the exact `__Host-` prefix |
+| `KeyRing::rotated` promoted a staged id whatever its bytes | a staged id with other bytes makes `with_ring` return `DuplicateKeyId` |
+| a ring without a signing key was `RingFull` | `NoSigningKey` |
 
 ## Migrating from 0.7
 

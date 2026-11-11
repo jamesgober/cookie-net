@@ -26,6 +26,8 @@ failed before its fix (`tests/review_09.rs`).
   cookie is kept under the context's top-level site.
 - `IgnoreReason::CrossSite` and `IgnoreReason::InvalidRequestUrl`.
 - `SetCookieView::has_path`.
+- `CookieError::NoSigningKey`, for a key ring without a signing key (was
+  `RingFull`).
 
 ### Fixed
 
@@ -49,6 +51,14 @@ failed before its fix (`tests/review_09.rs`).
 - `SetCookieView::unknown_attributes` counted empty segments.
 - `Sealer` built a cookie over 4096 bytes for names over 4035 bytes, and
   `sealed_len` could overflow.
+- `session_cookie` and `elevated_cookie` accepted a lowercase `__host-`
+  prefix, which the server's own byte-for-byte lookup of `__Host-sid` would
+  never find; they take the exact `__Host-` prefix.
+- `KeyRing::rotated` promoted a staged key id whatever the bytes; a switch to
+  other bytes under a staged id is now refused by `with_ring` as
+  `DuplicateKeyId`.
+- The one-shot MAC buffer, which held the value and the binding, is wiped
+  after use.
 
 ---
 
