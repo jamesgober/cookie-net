@@ -208,6 +208,44 @@ fn test_t25_jar_insecure_cannot_shadow_secure() {
     }
 }
 
+/// T25: a non-secure origin cannot evict a `Secure` cookie by flooding the
+/// domain and then replace it; non-secure cookies are evicted first
+/// (rfc6265bis section 5.7). Found by the 0.9 review.
+#[test]
+fn test_t25_jar_insecure_flood_cannot_evict_secure() {
+    let mut jar = Jar::new();
+    let https = RequestUrl::https("example.com", "/");
+    let http = RequestUrl::http("example.com", "/");
+    jar.store(&https, "sid=good; Secure", NOW);
+    for i in 0..60u64 {
+        jar.store(&http, &format!("f{i}=1")[..], NOW + 1 + i);
+    }
+    assert_eq!(
+        jar.cookies().filter(|c| c.domain == "example.com").count(),
+        50
+    );
+    assert_eq!(
+        jar.store(&http, "sid=evil", NOW + 100),
+        StoreOutcome::Ignored(IgnoreReason::WouldShadowSecure)
+    );
+    let header = jar.cookie_header(&https, NOW + 101).unwrap();
+    assert!(
+        header.contains("sid=good") && !header.contains("evil"),
+        "{header}"
+    );
+    // the whole-jar limit evicts non-secure cookies first too
+    let mut small = Jar::new().with_limits(JarLimits::DEFAULT.total(3));
+    small.store(&https, "sid=good; Secure", NOW);
+    for i in 0..5u64 {
+        small.store(
+            &RequestUrl::http(&format!("h{i}.example"), "/"),
+            "x=1",
+            NOW + 1 + i,
+        );
+    }
+    assert!(small.cookies().any(|c| c.name == b"sid"));
+}
+
 /// T27: a valid signed or sealed value of one session is refused in another.
 #[test]
 fn test_t27_session_bound_values_refused_in_another_session() {

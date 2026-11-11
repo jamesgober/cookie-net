@@ -32,7 +32,7 @@
 </p>
 
 <p>
-    Signed cookies (keyed BLAKE3) and encrypted cookies (XChaCha20-Poly1305), both through crypt-io, carry small client-held state: the cookie name is bound into the MAC, an optional expiry is enforced by the server, an optional binding ties a value to one session, and key rings rotate in stages so no node of a cluster refuses a cookie another node just made. For outbound clients there is a <code>Set-Cookie</code> parser that follows the user-agent algorithm and a bounded cookie jar that fails closed on domain cookies without a public suffix list. The whole API, with the version of each item, is in <a href="./docs/API.md"><code>docs/API.md</code></a>.
+    Signed cookies (keyed BLAKE3) and encrypted cookies (XChaCha20-Poly1305), both through crypt-io, carry small client-held state: the cookie name is bound into the MAC, an optional expiry is enforced by the server, an optional binding ties a value to one session, and key rings rotate in stages so no node of a cluster refuses a cookie another node just made. For outbound clients there is a <code>Set-Cookie</code> parser that follows the user-agent algorithm and a bounded cookie jar that fails closed on domain cookies without a public suffix list. The whole API, task by task, is in <a href="./docs/API.md"><code>docs/API.md</code></a>.
 </p>
 
 ---
@@ -62,7 +62,7 @@
 ### **Client side** (features `client`, `jar`)
 - **User-agent parsing** - `parse_set_cookie` and `cookie_date` follow rfc6265bis sections 5.6 and 5.1.1, so a client sees cookies as a browser does.
 - **A jar that refuses supercookies** - without a public suffix list, a `Domain` other than the host is refused; `Secure` cookies cannot be shadowed from plain HTTP; nameless cookies cannot plant a prefixed name.
-- **Bounded and portable** - per-domain and total limits with expired-first then least-recently-used eviction; state behind a `JarStore` trait; export and import with a checksum, validated as untrusted input.
+- **Bounded and portable** - per-domain and total limits with eviction in the rfc6265bis order (expired, then non-secure, then least recently used); state behind a `JarStore` trait; export and import with a checksum, validated as untrusted input.
 - **`SameSite` and partitions** - a request context for cross-site navigations, and partitioned cookies kept to their top-level site.
 
 ### **Reliability and safety**
@@ -77,21 +77,21 @@
 
 ```toml
 [dependencies]
-cookie-net = "0.7"
+cookie-net = "0.8"
 
 # signed and encrypted cookies:
-cookie-net = { version = "0.7", features = ["signed", "encrypted"] }
+cookie-net = { version = "0.8", features = ["signed", "encrypted"] }
 
 # an outbound client:
-cookie-net = { version = "0.7", features = ["jar"] }
+cookie-net = { version = "0.8", features = ["jar"] }
 
 # no_std, no allocator:
-cookie-net = { version = "0.7", default-features = false }
+cookie-net = { version = "0.8", default-features = false }
 ```
 
 | Feature | Default | Adds |
 |---|---|---|
-| `std` | yes | implies `alloc`; the clock-reading helpers of later versions |
+| `std` | yes | implies `alloc`; `verify_now` and `open_now`, which read the system clock |
 | `alloc` | through `std` | `SetCookie::encode`, `String`-returning signing |
 | `signed` | no | `Key`, `KeyRing`, `Signer` (crypt-io; works without `std` given an allocator) |
 | `encrypted` | no | `Sealer`; implies `signed` and `std` |
@@ -113,6 +113,8 @@ let theme = cookie::get(header, "theme").unwrap_or("light");
 // Writing
 let set = SetCookie::new("theme", "dark")?;                   // Secure; HttpOnly; SameSite=Lax; Path=/
 assert_eq!(set.encode(), "theme=dark; Path=/; Secure; HttpOnly; SameSite=Lax");
+# let _ = (sid, theme);
+# Ok::<(), cookie_net::CookieError>(())
 ```
 
 ### **Sessions**
@@ -126,6 +128,8 @@ let login = cookie::session_cookie("__Host-sid", token, 12 * cookie::HOUR)?;
 
 let sudo = cookie::elevated_cookie("__Host-sudo", token, 10 * cookie::MINUTE)?;   // SameSite=Strict
 let logout = SetCookie::delete("__Host-sid")?;                // revoke on the server first
+# let _ = (login, sudo, logout);
+# Ok::<(), cookie_net::CookieError>(())
 ```
 
 ### **The credential locator**
@@ -145,13 +149,16 @@ assert_eq!(found.severity_hint(), 5);
 use cookie_net::{self as cookie, Sealer, Signer};
 
 let now = 1_800_000_000;
-let signer = Signer::new(signing_key)?;                       // [u8; 32] from key-vault
+let signing_key = *b"an example key, 32 bytes long!!!";      // [u8; 32] from key-vault
+let sealing_key = *b"another example key, 32 bytes!!!";
+let signer = Signer::new(signing_key)?;
 let v = signer.sign_until("plan_banner", "dismissed", now + 30 * cookie::DAY)?;
 assert_eq!(signer.verify("plan_banner", &v, now)?, "dismissed");
 
 let sealer = Sealer::new(sealing_key)?;
 let flash = sealer.seal_until("flash", "Payment received.", now + 60)?;
 assert_eq!(sealer.open("flash", &flash, now)?.as_str(), Some("Payment received."));
+# Ok::<(), cookie_net::CookieError>(())
 ```
 
 ### **An outbound client**
@@ -159,10 +166,12 @@ assert_eq!(sealer.open("flash", &flash, now)?.as_str(), Some("Payment received."
 ```rust
 use cookie_net::{Jar, RequestUrl};
 
+let now = 1_800_000_000;
 let mut jar = Jar::new();
 let url = RequestUrl::https("api.example.com", "/oauth/token");
 jar.store(&url, "sid=abc; Path=/; Secure; HttpOnly", now);
-let header = jar.cookie_header(&RequestUrl::https("api.example.com", "/v1/orders"), now);   // Some("sid=abc")
+let header = jar.cookie_header(&RequestUrl::https("api.example.com", "/v1/orders"), now);
+assert_eq!(header.as_deref(), Some("sid=abc"));
 ```
 
 ### **Rules that cannot be broken**
@@ -194,7 +203,7 @@ Measured against `cookie`, `biscotti`, and `cookie_store` on the same bytes ([`d
 | jar `Cookie` header | 56% |
 | sealing, opening | about 4 times **slower** than AES-256-GCM: the cipher; XAES-256-GCM is planned |
 
-## Status: hardening (`0.7.1`)
+## Status: alpha (`0.8.0`)
 
 **Done:** the request side, the response side, the session helpers (0.3); signed and encrypted cookies with key rings, staged rotation, fingerprints, expiry, and session binding (0.4); the client parser, the cookie-date algorithm, the cookie jar with a store trait and export, and `Clear-Site-Data` for cookie-bomb recovery (0.5). Each rule tested with its source; property, counting-allocator, complexity, and attack tests; test vectors; nine fuzz targets.
 
@@ -202,7 +211,9 @@ Measured against `cookie`, `biscotti`, and `cookie_store` on the same bytes ([`d
 
 **0.7:** every fuzz target run for 24 hours with no findings, attack tests for every threat T1 to T30, a one-hour jar soak with flat memory, no panic paths in library code (enforced by clippy), and a system clock that fails closed. The threat model is [`docs/SECURITY.md`](./docs/SECURITY.md).
 
-**Next:** `0.8` alpha, when the WASP gates, gate-net, and web-net are built on cookie-net. The schedule is in [`dev/ROADMAP.md`](./dev/ROADMAP.md).
+**0.8:** a simpler API (one way to read a header, one `SameSite` type), parse-net 0.9, and an API reference whose examples run as tests. web-net and the WASP gates (gatekeeper-io) pass their test suites on it. Moving from 0.7 is in [`docs/API.md`](./docs/API.md#migrating-from-07).
+
+**Next:** `0.9` beta: an adversarial review with every finding fixed test-first, then the pre-1.0 polish pass. The schedule is in [`dev/ROADMAP.md`](./dev/ROADMAP.md).
 
 **API stability:** the API was locked at `0.2.0`; names change only with a recorded decision in [`dev/PLAN.md`](./dev/PLAN.md). Measured performance is in [`docs/PERFORMANCE.md`](./docs/PERFORMANCE.md).
 
@@ -218,7 +229,7 @@ Measured against `cookie`, `biscotti`, and `cookie_store` on the same bytes ([`d
 
 ## Documentation
 
-- **[API Reference](./docs/API.md)** - every public item, its version, errors, and examples
+- **[API Reference](./docs/API.md)** - a tour of every public item, its errors, and examples that run as tests
 - **[Which cookie, when](./docs/COOKIES.md)** - session tokens, signed and sealed state, `SameSite`, the rotation runbook
 - **[Formats](./docs/FORMATS.md)** - the byte-exact signed, sealed, and jar export formats, with test vectors
 - **[Architecture](./docs/ARCHITECTURE.md)** - modules, data flow, memory, and bounds

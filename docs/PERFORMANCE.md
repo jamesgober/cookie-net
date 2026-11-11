@@ -11,6 +11,7 @@
 - [Ratios against the best competitor](#ratios-against-the-best-competitor)
 - [criterion results](#criterion-results)
 - [What changed in 0.6](#what-changed-in-06)
+- [The 0.8 recheck](#the-08-recheck)
 - [The sealing shortfall](#the-sealing-shortfall)
 - [Reproducing](#reproducing)
 
@@ -82,6 +83,26 @@ criterion's wall-clock medians from the same harness, taken while the machine wa
 | The prefixed-duplicate table cut from 64 to 16 slots | `locate` and `stats` no longer zero 1 KiB per call | D-072 |
 
 No output byte changed: the pinned format vectors and every test pass unchanged.
+
+## The 0.8 recheck
+
+0.8 moved from parse-net 0.6.1 to 0.9.3. The ratio tool ran cookie-net 0.7.1 and the 0.8 branch alternately, two rounds each, under the same load (a load average near 40, with nine fuzzers running), on the machine above.
+
+| Row | 0.7.1 (ns, two rounds) | 0.8 (ns, two rounds) | 0.8 ahead of the best competitor |
+|---|---|---|---|
+| C1 get | 114.8, 117.2 | 112.7, 114.2 | +41% |
+| C2 get_unique | 241.2, 242.5 | 222.2, 237.3 | +45 to 48% |
+| C2 locate | 276.8, 261.5 | 265.9, 272.1 | +39 to 40% |
+| C3 iterate | 221.6, 231.4 | 233.1, 241.8 | +44% |
+| C4 set_cookie (slice) | 46.5, 51.5 | 49.5, 52.8 | +63 to 64% |
+| C4 set_cookie (String) | 60.6, 61.1 | 64.0, 65.0 | +58 to 59% |
+| C5 session_cookie | 83.2, 86.2 | 87.4, 87.0 | +58 to 60% |
+| C6 sign 64 B | 209.3, 216.6 | 203.9, 204.6 | +46 to 47% |
+| C7 verify 64 B | 248.3, 248.8 | 246.0, 252.8 | +31 to 33% |
+| C10 parse_set_cookie | 301.1, 315.3 | 316.6, 294.5 | +36 to 37% |
+| C11 jar header | 750.0, 770.4 | 795.0, 749.1 | +56% |
+
+No row moved beyond the noise between rounds (C4 alone moved 10% between two rounds of the same build). The parse-net code cookie-net calls on these paths (`write.rs` with `Sink`, `SliceSink`, and the `Vec` sink; `class.rs`; `scan.rs`) is byte-identical between 0.6.1 and 0.9.3, and cookie-net's own write path did not change, so the 3 to 6% that C4 and C5 show is not a regression. Sealing (C8, C9) is unchanged and still short, for the reason below.
 
 ## The sealing shortfall
 

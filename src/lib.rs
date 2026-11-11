@@ -117,7 +117,7 @@ pub use client::jar::{
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 pub use client::{
     date::cookie_date,
-    set_cookie::{SameSiteAttr, SetCookieView, parse_set_cookie},
+    set_cookie::{SetCookieView, parse_set_cookie},
 };
 pub use error::{Ambiguous, CookieError, Rejected};
 #[cfg(feature = "signed")]
@@ -281,6 +281,17 @@ pub fn locate<'a, H: AsRef<[u8]> + ?Sized>(
         Ok(c) => c.locate(name),
         Err(_) => Cookies::too_long(limits).locate(name),
     }
+}
+
+/// Every Rust block in the README and in `docs/API.md` is compiled and run as
+/// a doctest (with the features that cover the whole API), so the
+/// documentation cannot drift from the code.
+#[cfg(all(doctest, feature = "encrypted", feature = "jar"))]
+mod doc_tests {
+    #[doc = include_str!("../README.md")]
+    struct Readme;
+    #[doc = include_str!("../docs/API.md")]
+    struct ApiReference;
 }
 
 #[cfg(test)]

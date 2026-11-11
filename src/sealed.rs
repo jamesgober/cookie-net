@@ -354,8 +354,10 @@ impl Sealer {
         Ok(Plaintext(Zeroizing::new(out)))
     }
 
-    /// Opens into the caller's buffer, which is cleared first and wiped on
-    /// every failure; once it has capacity, opening allocates nothing.
+    /// Opens into the caller's buffer. The buffer's whole capacity is wiped
+    /// first, so no earlier plaintext survives any outcome, and again on
+    /// every failure after decryption; its capacity is kept, so once it has
+    /// room, opening allocates nothing.
     ///
     /// # Errors
     ///
@@ -381,7 +383,7 @@ impl Sealer {
         now: u64,
         out: &mut Vec<u8>,
     ) -> Result<Opened, Rejected> {
-        out.clear();
+        crypt_io::wipe_vec(out);
         let raw = raw.as_ref();
         // 1. length
         if raw.len() < b64::encoded_len(OVERHEAD) || raw.len() > PAIR_MAX {
@@ -413,7 +415,7 @@ impl Sealer {
         let expires = keys::decode_expiry(u32::from_be_bytes(exp));
         if expires.is_some_and(|t| now >= t.saturating_add(self.skew)) {
             // The plaintext is already in `out`: wipe it before refusing.
-            drop(Zeroizing::new(core::mem::take(out)));
+            crypt_io::wipe_vec(out);
             return Err(Rejected::Expired);
         }
         Ok(Opened {
@@ -710,6 +712,26 @@ mod tests {
             s.seal_until("f", "x", u64::MAX).unwrap_err(),
             CookieError::ExpiresOutOfRange
         );
+    }
+
+    #[test]
+    fn test_open_into_keeps_capacity_on_every_failure() {
+        let s = Sealer::new(K1).unwrap();
+        let v = s.seal_until("f", "TOPSECRETPLAINTEXT", NOW).unwrap();
+        let mut out = Vec::with_capacity(512);
+        assert!(s.open_into("f", &v, &[], NOW, &mut out).is_ok());
+        // a later failure of any kind leaves the buffer empty, wiped, and
+        // with its capacity, so a reused buffer never allocates again
+        let cases = [
+            ("f", "short", NOW, Rejected::Malformed),
+            ("g", v.as_str(), NOW, Rejected::BadTag),
+            ("f", v.as_str(), NOW + 60, Rejected::Expired),
+        ];
+        for (name, raw, now, why) in cases {
+            assert_eq!(s.open_into(name, raw, &[], now, &mut out).unwrap_err(), why);
+            assert!(out.is_empty());
+            assert_eq!(out.capacity(), 512, "{why:?}");
+        }
     }
 
     #[test]

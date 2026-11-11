@@ -8,7 +8,7 @@
 /// use cookie_net::{Cookies, Limits, ValueMode};
 ///
 /// let h = r#"consent={"ads":false}; sid=abc"#;
-/// assert_eq!(Cookies::new(h).get("consent"), None);   // strict: skipped and counted
+/// assert_eq!(cookie_net::parse(h).get("consent"), None);   // strict: skipped and counted
 /// let lenient = Cookies::with_limits(h, &Limits::DEFAULT.value_mode(ValueMode::Lenient))?;
 /// assert_eq!(lenient.get("consent"), Some(r#"{"ads":false}"#));
 /// # Ok::<(), cookie_net::CookieError>(())

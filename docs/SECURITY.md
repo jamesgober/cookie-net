@@ -50,7 +50,7 @@ cookie-net reads `Cookie` headers, writes `Set-Cookie` headers, signs and encryp
 | T19 | a session cookie sent over HTTP or read by scripts | `Secure` and `HttpOnly` fixed by the helpers; `__Host-` requires `Secure` | `test_t19_*` | none |
 | T20 | CSRF | `SameSite=Lax` by default, `Strict` for elevation; csrf-sec covers unsafe methods | `test_t20_*` | none |
 | T21 | `SameSite=None` or `Partitioned` without `Secure` | refused when building and when storing in the jar | `test_t21_*`, jar unit tests | none |
-| T22 | `Domain` set to a public suffix, an IP address, or a single label | refused when building; the jar fails closed without a suffix list | `test_t22_*`, `test_supercookie_refused_without_a_list` | none |
+| T22 | `Domain` set to a public suffix, an IP address, or a single label | an IP address or a single label is refused when building; a public suffix is refused by the jar, which fails closed without a suffix list (the builder has no list, so `domain("co.uk")` builds, and the browser refuses it) | `test_t22_*`, `test_supercookie_refused_without_a_list` | none |
 | T23 | secrets in logs | `Debug` prints lengths, never values or keys; no `Display` for values; errors carry positions | `test_t23_*`, property tests over random values | none |
 | T24 | memory exhaustion in the jar | `JarLimits`, eviction, 4096 bytes per cookie | `test_t24_*`, `tests/soak.rs` (one hour, flat resident memory) | bounded |
 | T25 | a non-secure origin overwriting a `Secure` cookie in the jar | "leave secure cookies alone" | `test_t25_*`, `test_insecure_origin_cannot_toss_over_a_secure_cookie` | none |

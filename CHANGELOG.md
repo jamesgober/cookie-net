@@ -13,6 +13,43 @@
 
 ---
 
+## [0.8.0] - 2026-11-11
+
+Alpha: a simpler API, parse-net 0.9, and documentation that runs.
+
+### Changed
+
+- **Breaking:** `Cookies::new` is no longer public; `cookie_net::parse` is the
+  one way to read a whole header (`Cookies::with_limits` and
+  `Cookies::from_lines` are unchanged).
+- **Breaking:** `SameSiteAttr` is removed. `SetCookieView::same_site` and
+  `StoredCookie::same_site` are `Option<SameSite>`, where `None` means absent
+  or an unknown value (`SameSiteAttr::Default` before).
+- **Breaking:** parse-net 0.9 (was 0.6.1). `Sink`, `SliceSink`, and `Full`
+  come from parse-net 0.9 now.
+- `docs/API.md` is a task-oriented tour of the API, with a migration note
+  from 0.7. Every example in it and in the README is compiled and run as a
+  doctest.
+
+### Fixed
+
+- **Security:** the jar evicted the least recently used cookie without
+  regard to `Secure`, so a plain-HTTP origin could store enough cookies for a
+  domain to evict a `Secure` cookie and then replace it (threat T25).
+  Eviction now removes expired cookies, then non-secure ones, then secure
+  ones, as rfc6265bis section 5.7 requires. Present since 0.5.
+- `Sealer::open_into` wipes the buffer's whole capacity before opening, and
+  keeps its capacity on every failure; an early failure used to leave an
+  earlier plaintext in the spare capacity, and `Expired` dropped the
+  allocation.
+- Five documentation statements that did not match the code.
+
+The signed, sealed, and jar export formats are unchanged: cookies and
+exports made by 0.7 keep working. The 0.9 review's other findings, in the
+jar and in edge cases, are listed in `dev/ROADMAP.md` and fixed in 0.9.0.
+
+---
+
 ## [0.7.1] - 2026-11-02
 
 Dependency floor. No API or format change.
@@ -254,7 +291,8 @@ The scaffold and the plan. No functional code yet.
 - `dev/PLAN.md` (purpose, scope, architecture, threats, ecosystem, open
   decisions, decision log), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 
-[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/jamesgober/cookie-net/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/jamesgober/cookie-net/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/jamesgober/cookie-net/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jamesgober/cookie-net/compare/v0.5.0...v0.6.0

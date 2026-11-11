@@ -184,10 +184,10 @@ impl<'a> Cookies<'a> {
     /// # Examples
     ///
     /// ```
-    /// assert_eq!(cookie_net::Cookies::new("a=1; b=2").iter().count(), 2);
+    /// assert_eq!(cookie_net::parse("a=1; b=2").iter().count(), 2);
     /// ```
     #[must_use]
-    pub fn new<H: AsRef<[u8]> + ?Sized>(header: &'a H) -> Cookies<'a> {
+    pub(crate) fn new<H: AsRef<[u8]> + ?Sized>(header: &'a H) -> Cookies<'a> {
         let header = header.as_ref();
         Self {
             src: Source::One(header),
@@ -279,7 +279,7 @@ impl<'a> Cookies<'a> {
     /// # Examples
     ///
     /// ```
-    /// let c = cookie_net::Cookies::new("a=1; =2; b=3");
+    /// let c = cookie_net::parse("a=1; =2; b=3");
     /// let names: Vec<&str> = c.iter().map(|p| p.name()).collect();
     /// assert_eq!(names, ["a", "b"]);
     /// ```
@@ -297,7 +297,7 @@ impl<'a> Cookies<'a> {
     /// # Examples
     ///
     /// ```
-    /// assert_eq!(cookie_net::Cookies::new("a=1; a=2").get("a"), Some("1"));
+    /// assert_eq!(cookie_net::parse("a=1; a=2").get("a"), Some("1"));
     /// ```
     #[must_use]
     pub fn get(&self, name: &str) -> Option<&'a str> {
@@ -318,8 +318,8 @@ impl<'a> Cookies<'a> {
     /// ```
     /// use cookie_net::{Ambiguous, Cookies};
     ///
-    /// assert_eq!(Cookies::new("a=1; b=2").get_unique("b"), Ok(Some("2")));
-    /// assert_eq!(Cookies::new("a=1; a=2").get_unique("a"), Err(Ambiguous::Duplicate { count: 2 }));
+    /// assert_eq!(cookie_net::parse("a=1; b=2").get_unique("b"), Ok(Some("2")));
+    /// assert_eq!(cookie_net::parse("a=1; a=2").get_unique("a"), Err(Ambiguous::Duplicate { count: 2 }));
     /// ```
     pub fn get_unique(&self, name: &str) -> Result<Option<&'a str>, Ambiguous> {
         let mut s = self.scanner();
@@ -347,7 +347,7 @@ impl<'a> Cookies<'a> {
     /// # Examples
     ///
     /// ```
-    /// let v: Vec<&str> = cookie_net::Cookies::new("c=2; t=d; c=1").get_all("c").collect();
+    /// let v: Vec<&str> = cookie_net::parse("c=2; t=d; c=1").get_all("c").collect();
     /// assert_eq!(v, ["2", "1"]);
     /// ```
     #[must_use]
@@ -366,7 +366,7 @@ impl<'a> Cookies<'a> {
     /// ```
     /// use cookie_net::{Cookies, Lookup};
     ///
-    /// let found = Cookies::new("sid=x; __Host-sid=t").locate("__Host-sid");
+    /// let found = cookie_net::parse("sid=x; __Host-sid=t").locate("__Host-sid");
     /// assert_eq!((found.lookup, found.shadows), (Lookup::One("t"), 1));
     /// ```
     #[must_use]
@@ -416,7 +416,7 @@ impl<'a> Cookies<'a> {
     /// use core::ops::ControlFlow;
     ///
     /// let mut analytics = 0;
-    /// let stats = cookie_net::Cookies::new("_ga=1; _gid=2; sid=x").scan(|pair| {
+    /// let stats = cookie_net::parse("_ga=1; _gid=2; sid=x").scan(|pair| {
     ///     if pair.name().starts_with('_') { analytics += 1; }
     ///     ControlFlow::Continue(())
     /// });
@@ -439,7 +439,7 @@ impl<'a> Cookies<'a> {
     /// # Examples
     ///
     /// ```
-    /// let s = cookie_net::Cookies::new("a=1; b c=2").stats();
+    /// let s = cookie_net::parse("a=1; b c=2").stats();
     /// assert_eq!((s.pairs, s.skipped), (1, 1));
     /// ```
     #[must_use]
@@ -452,7 +452,7 @@ impl<'a> Cookies<'a> {
     /// # Examples
     ///
     /// ```
-    /// assert!(cookie_net::Cookies::new("; =x").is_empty());
+    /// assert!(cookie_net::parse("; =x").is_empty());
     /// ```
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -548,8 +548,8 @@ impl fmt::Debug for GetAll<'_, '_> {
 /// ```
 /// use cookie_net::{Cookies, Lookup};
 ///
-/// assert_eq!(Cookies::new("a=1").locate("b").lookup, Lookup::Missing);
-/// assert_eq!(Cookies::new("a=1; a=2").locate("a").lookup, Lookup::Many { first: "1", count: 2 });
+/// assert_eq!(cookie_net::parse("a=1").locate("b").lookup, Lookup::Missing);
+/// assert_eq!(cookie_net::parse("a=1; a=2").locate("a").lookup, Lookup::Many { first: "1", count: 2 });
 /// ```
 #[non_exhaustive]
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -629,9 +629,9 @@ impl Located<'_> {
     /// ```
     /// use cookie_net::Cookies;
     ///
-    /// assert_eq!(Cookies::new("__Host-sid=a; __Host-sid=b").locate("__Host-sid").severity_hint(), 30);
-    /// assert_eq!(Cookies::new("sid=a; sid=b").locate("sid").severity_hint(), 10);
-    /// assert_eq!(Cookies::new("__Host-sid=a").locate("__Host-sid").severity_hint(), 0);
+    /// assert_eq!(cookie_net::parse("__Host-sid=a; __Host-sid=b").locate("__Host-sid").severity_hint(), 30);
+    /// assert_eq!(cookie_net::parse("sid=a; sid=b").locate("sid").severity_hint(), 10);
+    /// assert_eq!(cookie_net::parse("__Host-sid=a").locate("__Host-sid").severity_hint(), 0);
     /// ```
     #[must_use]
     pub const fn severity_hint(&self) -> u8 {

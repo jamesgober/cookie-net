@@ -9,7 +9,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-parse-net = "0.6.1"
+parse-net = "0.9.3"
 
 [dependencies.cookie-net]
 path = ".."
