@@ -97,12 +97,25 @@ Exit: `cargo audit` clean on both resolutions. **Met 2026-11-02.**
 - [x] The consumers confirm the session helpers: web-net 0.9.0 and gatekeeper-io 0.4.1 pass their full test suites on cookie-net 0.8 with only the version requirement changed (D-085). gatekeeper-io's own cookie code was on 0.8 (its 18 sign-in tests cover sign-in, sign-out, the second factor, and CSRF); its web-net adapter still pulled web-net's cookie-net 0.7.1 beside it, which works because no cookie-net type crosses between the two.
 - [x] csrf-sec's expectations of the session cookie (`__Host-`, `SameSite=Lax` or stricter, `Secure`, `HttpOnly`, no CSRF cookie) checked against csrf-sec 0.9.4 by `test_csrf_layer_three_expectations`.
 
+- [x] Fixed before release from the 0.9 review (D-086): jar eviction now removes non-secure cookies before secure ones, so a plain-HTTP origin can no longer flood a domain to evict a `Secure` cookie and replace it (threat T25, high); `Sealer::open_into` wipes the buffer's whole capacity and keeps it on every outcome; five documentation statements corrected.
+
+**Moved, with reason:** the review's other findings, all medium or low and present since 0.4 or 0.5, are the 0.9.0 work (D-086). None touches what web-net or gatekeeper-io use. They are:
+  - the jar's `cookie_header` returns `None` for every cookie when one stored value is not UTF-8;
+  - `Jar::import` adds duplicates instead of replacing, does not re-apply the storage rules (prefixes, `Secure` needs, suffixes, the 400-day cap, `last_access` from the file), costs time proportional to records times jar size, and refuses a whole export when one default path holds `;` or passes 1024 bytes;
+  - `store` takes no request context, so a cross-site response's `Lax` or `Strict` cookie is stored, and partitioned cookies are keyed by the setting host;
+  - an IP-address host can get a domain cookie when a suffix list is supplied; `Domain=.` is ignored instead of stored host-only;
+  - expired cookies still in the store block a replacement as `WouldShadowSecure` or donate their creation time; cookies are ordered by insertion, not creation;
+  - a `__Host-` cookie whose `Path` falls back to the default path `/` is refused;
+  - `Sealer::seal` with a name over 4035 bytes builds a cookie over 4096 bytes; `sealed_len` overflows for absurd lengths;
+  - the strict `Cookie` parser skips pairs with spaces around `=`, which rfc6265bis allows; `unknown_attributes` counts empty segments.
+
 **Moved, with reason:** web-net preferences and flash messages on `Signer` and `Sealer` move to 0.9 consumer adoption. web-net 0.9.0 has no preferences or flash messages yet; cookie-net cannot build them for it.
 
 Exit: the end-to-end WASP login flow is green with cookie-net; csrf-sec's expectations of the session cookie verified. **Met 2026-11-11** (gatekeeper-io's login, sign-out, and elevation tests on cookie-net 0.8).
 
 ## v0.9.0 - Beta
 
+- [ ] Every finding of the adversarial review (three independent reviews at 0.8: standards conformance, attacks, edge cases) fixed test-first; the list is under 0.8 above (D-086).
 - [ ] gate-net and web-net use it end to end (DIRECTIVES definition of done, item 10); fetch-net uses the jar if it exists by then; API frozen except fixes.
 
 Exit: an adversarial review with every finding fixed test-first.

@@ -191,7 +191,7 @@ assert_eq!(carts, ["2", "1"]);
 | `.scan(f)` | one pass calling `f` for each pair; `ControlFlow::Break(())` stops early; returns `Stats` for the pairs seen |
 | `.is_empty()` | no accepted pair |
 
-`Debug` on `Cookies` shows the pair count and the names, never the values.
+`Debug` on `Cookies` shows the names and whether the header was too long, never the values.
 
 ```rust
 use cookie_net as cookie;
@@ -244,7 +244,7 @@ Facts about a header for detection (customs-sec, sentinel-sec). Computing them i
 |---|---|
 | `pairs` | accepted pairs |
 | `skipped` | pairs that broke the grammar or a length limit (not empty pairs) |
-| `empty` | `;;` or a trailing `;` |
+| `empty` | empty pairs: `;;`, or a leading or trailing `;` |
 | `loose_separators` | `;` without one space after it, or with more whitespace |
 | `prefixed_duplicates` | extra occurrences of `__Host-` or `__Secure-` names (the first 16 distinct names are tracked) |
 | `truncated` | the scan stopped at `max_pairs` |
@@ -394,7 +394,7 @@ A `Set-Cookie` field value that is valid by construction: the only ways to get o
 | `SetCookie::builder(name, value)` | a [`SetCookieBuilder`](#setcookiebuilder) for other attributes |
 | `.encode()` | the field value as a `String` (feature `alloc`) |
 | `.encode_into(&mut buf)` | into a byte buffer, returning the `&str` written; `Full` when it does not fit |
-| `.write_to(&mut sink)` | into a `parse_net::Sink`; `Full` when it does not fit, and the sink is left as it was |
+| `.write_to(&mut sink)` | into a `parse_net::Sink`; `Full` when it does not fit, and a sink that reports its room (`SliceSink`, `Vec`) is left as it was |
 | `.encoded_len()` | the exact length of the encoding, to size a buffer once |
 | `name()`, `value()`, `path()`, `domain()`, `max_age()`, `expires()`, `same_site()` | the attributes |
 | `is_secure()`, `is_http_only()`, `is_partitioned()`, `is_deletion()` | the flags |
@@ -764,7 +764,7 @@ Feature `encrypted`. For small client-held state that must also stay private: a 
 - The cookie name, the expiry, and the binding are authenticated, so a sealed value cannot move to another name or session. Expiry, binding, and skew behave as for `Signer`.
 - `TooLarge` (the plaintext is over `max_plaintext`) is returned before any cryptography. `Crypto` is returned if the random source fails, and nothing is written.
 - `Plaintext` is owned and wiped on drop: `as_bytes()`, `as_str()` (when it is UTF-8), `len()`, `is_empty()`; its `Debug` prints only the length.
-- `open_into` writes into your `Vec`, which is cleared first and wiped if authentication fails. Once it has capacity, opening allocates nothing.
+- `open_into` writes into your `Vec`. Its whole capacity is wiped first, so no earlier plaintext survives, and again on every failure after decryption; the capacity is kept, so once it has room, opening allocates nothing.
 
 ```rust
 use cookie_net::{self as cookie, Rejected, Sealer, SetCookie};
@@ -883,7 +883,7 @@ Feature `jar`. A bounded store that follows the rfc6265bis storage (section 5.7)
 - `store` applies the storage steps that apply to a client: a `Secure` cookie only from a secure origin; a non-secure origin can neither overwrite nor shadow a `Secure` cookie; `Domain` must domain-match the host and pass the public suffix check; the `__Host-` and `__Secure-` rules; `SameSite=None` and `Partitioned` need `Secure`; a nameless cookie whose value starts with a prefix is ignored; replacing a cookie keeps its creation time; expiry is capped at 400 days.
 - `cookie_header` picks host-only or domain-matching cookies, path-matching, `Secure` only over secure channels, `SameSite` against the context; longer paths first, then earlier creation; `"; "` between pairs. It updates last-access times.
 - Partitioned cookies are kept under the request host as their partition key and sent only when the context's top-level site matches.
-- Memory is bounded by the limits, never by input: over a limit, expired cookies go first, then the least recently used. `Debug` shows counts and limits, never values.
+- Memory is bounded by the limits, never by input: over a limit, expired cookies go first, then the least recently used non-secure cookie, then the least recently used secure one (rfc6265bis section 5.7), so a plain-HTTP origin cannot evict a `Secure` cookie by flooding a domain. `Debug` shows counts and limits, never values.
 
 ```rust
 use cookie_net::{IgnoreReason, Jar, RequestUrl, StoreOutcome};

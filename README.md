@@ -62,7 +62,7 @@
 ### **Client side** (features `client`, `jar`)
 - **User-agent parsing** - `parse_set_cookie` and `cookie_date` follow rfc6265bis sections 5.6 and 5.1.1, so a client sees cookies as a browser does.
 - **A jar that refuses supercookies** - without a public suffix list, a `Domain` other than the host is refused; `Secure` cookies cannot be shadowed from plain HTTP; nameless cookies cannot plant a prefixed name.
-- **Bounded and portable** - per-domain and total limits with expired-first then least-recently-used eviction; state behind a `JarStore` trait; export and import with a checksum, validated as untrusted input.
+- **Bounded and portable** - per-domain and total limits with eviction in the rfc6265bis order (expired, then non-secure, then least recently used); state behind a `JarStore` trait; export and import with a checksum, validated as untrusted input.
 - **`SameSite` and partitions** - a request context for cross-site navigations, and partitioned cookies kept to their top-level site.
 
 ### **Reliability and safety**

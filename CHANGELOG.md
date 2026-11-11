@@ -31,8 +31,22 @@ Alpha: a simpler API, parse-net 0.9, and documentation that runs.
   from 0.7. Every example in it and in the README is compiled and run as a
   doctest.
 
+### Fixed
+
+- **Security:** the jar evicted the least recently used cookie without
+  regard to `Secure`, so a plain-HTTP origin could store enough cookies for a
+  domain to evict a `Secure` cookie and then replace it (threat T25).
+  Eviction now removes expired cookies, then non-secure ones, then secure
+  ones, as rfc6265bis section 5.7 requires. Present since 0.5.
+- `Sealer::open_into` wipes the buffer's whole capacity before opening, and
+  keeps its capacity on every failure; an early failure used to leave an
+  earlier plaintext in the spare capacity, and `Expired` dropped the
+  allocation.
+- Five documentation statements that did not match the code.
+
 The signed, sealed, and jar export formats are unchanged: cookies and
-exports made by 0.7 keep working.
+exports made by 0.7 keep working. The 0.9 review's other findings, in the
+jar and in edge cases, are listed in `dev/ROADMAP.md` and fixed in 0.9.0.
 
 ---
 

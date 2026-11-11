@@ -1011,8 +1011,8 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
     }
 
     /// Keeps the bounds after a cookie for `domain` was added: that domain,
-    /// then the whole jar; expired cookies go first, then the least recently
-    /// used. Linear in the jar's size.
+    /// then the whole jar, in the order of `evict_one`.
+    /// Linear in the jar's size.
     fn evict(&mut self, now: u64, domain: &str) {
         let per_domain = usize::from(self.limits.per_domain);
         while self.cookies().filter(|c| c.domain == domain).count() > per_domain {
@@ -1028,8 +1028,11 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
         }
     }
 
-    /// Removes one cookie among those `f` selects: an expired one if any,
-    /// else the least recently used (then the oldest).
+    /// Removes one cookie among those `f` selects, in the order of rfc6265bis
+    /// section 5.7: an expired one if any, else the least recently used
+    /// non-secure one, else the least recently used (then the oldest). Secure
+    /// cookies go last, so a non-secure origin cannot flood a domain to evict
+    /// a `Secure` cookie and then replace it (threat T25).
     fn evict_one(&mut self, now: u64, f: impl Fn(&StoredCookie) -> bool) -> bool {
         let candidates = (0..self.store.len()).filter(|&i| self.store.get(i).is_some_and(&f));
         let victim = candidates
@@ -1040,8 +1043,11 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
                     .is_some_and(|c| c.expiry.is_some_and(|e| e <= now))
             })
             .or_else(|| {
-                candidates
-                    .min_by_key(|&i| self.store.get(i).map_or((0, 0), |c| (c.last_access, c.seq)))
+                candidates.min_by_key(|&i| {
+                    self.store
+                        .get(i)
+                        .map_or((false, 0, 0), |c| (c.secure, c.last_access, c.seq))
+                })
             });
         victim.is_some_and(|i| self.store.swap_remove(i).is_some())
     }
