@@ -795,8 +795,10 @@ const fn could_shadow(len: usize, core: usize) -> bool {
 /// sliced out of it with no second check.
 fn classify<'a>(seg: &'a [u8], limits: &Limits, text: Option<&'a str>) -> Option<Pair<'a>> {
     let eq = find_byte(b'=', seg)?;
-    let name = seg.get(..eq)?;
-    let value = seg.get(eq + 1..)?;
+    // `cookie-pair = cookie-name BWS "=" BWS cookie-value` (section 4.1.1):
+    // spaces and tabs around `=` are not part of the name or the value.
+    let name = trim_end(seg.get(..eq)?);
+    let value = trim_start(seg.get(eq + 1..)?);
     if name.is_empty()
         || name.len() > usize::from(limits.name_len())
         || name::first_non_tchar(name).is_some()
@@ -814,11 +816,12 @@ fn classify<'a>(seg: &'a [u8], limits: &Limits, text: Option<&'a str>) -> Option
         return None;
     }
     if let Some(text) = text {
-        // `seg` lies inside the line `text` was made from.
-        let at = (name.as_ptr() as usize).wrapping_sub(text.as_ptr() as usize);
-        let value_at = at + eq + 1;
+        // `name` and `value` lie inside the line `text` was made from.
+        let base = text.as_ptr() as usize;
+        let at = (name.as_ptr() as usize).wrapping_sub(base);
+        let value_at = (value.as_ptr() as usize).wrapping_sub(base);
         if let (Some(n), Some(v)) = (
-            text.get(at..at + eq),
+            text.get(at..at + name.len()),
             text.get(value_at..value_at + value.len()),
         ) {
             return Some(Pair { name: n, value: v });

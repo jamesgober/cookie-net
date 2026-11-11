@@ -39,6 +39,10 @@ pub struct SetCookieView<'a> {
     /// `Path`; `None` also when the value does not start with `/` (the jar
     /// then uses the default path).
     pub path: Option<&'a [u8]>,
+    /// A `Path` attribute was present, even one whose value does not start
+    /// with `/` (the cookie's path is then the default path, section 5.6.4).
+    /// A `__Host-` cookie needs one (section 5.7).
+    pub has_path: bool,
     /// `Secure`.
     pub secure: bool,
     /// `HttpOnly`.
@@ -49,7 +53,8 @@ pub struct SetCookieView<'a> {
     pub same_site: Option<SameSite>,
     /// `Partitioned` (CHIPS).
     pub partitioned: bool,
-    /// Attributes not recognised, saturating at 255.
+    /// Attributes not recognised, saturating at 255 (empty segments such as
+    /// `;;` are not attributes and are not counted).
     pub unknown_attributes: u8,
 }
 
@@ -62,6 +67,7 @@ impl fmt::Debug for SetCookieView<'_> {
             .field("max_age", &self.max_age)
             .field("domain", &self.domain.map(Text))
             .field("path", &self.path.map(Text))
+            .field("has_path", &self.has_path)
             .field("secure", &self.secure)
             .field("http_only", &self.http_only)
             .field("same_site", &self.same_site)
@@ -131,6 +137,7 @@ pub fn parse_set_cookie<L: AsRef<[u8]> + ?Sized>(line: &L) -> Option<SetCookieVi
         max_age: None,
         domain: None,
         path: None,
+        has_path: false,
         secure: false,
         http_only: false,
         same_site: None,
@@ -171,6 +178,7 @@ fn apply<'a>(view: &mut SetCookieView<'a>, attr: &[u8], v: &'a [u8]) {
             view.domain = Some(v.strip_prefix(b".").unwrap_or(v));
         }
     } else if is("Path") {
+        view.has_path = true;
         view.path = (v.first() == Some(&b'/')).then_some(v);
     } else if is("Secure") {
         view.secure = true;
@@ -188,7 +196,7 @@ fn apply<'a>(view: &mut SetCookieView<'a>, attr: &[u8], v: &'a [u8]) {
         };
     } else if is("Partitioned") {
         view.partitioned = true;
-    } else {
+    } else if !(attr.is_empty() && v.is_empty()) {
         view.unknown_attributes = view.unknown_attributes.saturating_add(1);
     }
 }
