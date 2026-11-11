@@ -32,7 +32,7 @@
 </p>
 
 <p>
-    Signed cookies (keyed BLAKE3) and encrypted cookies (XChaCha20-Poly1305), both through crypt-io, carry small client-held state: the cookie name is bound into the MAC, an optional expiry is enforced by the server, an optional binding ties a value to one session, and key rings rotate in stages so no node of a cluster refuses a cookie another node just made. For outbound clients there is a <code>Set-Cookie</code> parser that follows the user-agent algorithm and a bounded cookie jar that fails closed on domain cookies without a public suffix list. The whole API, with the version of each item, is in <a href="./docs/API.md"><code>docs/API.md</code></a>.
+    Signed cookies (keyed BLAKE3) and encrypted cookies (XChaCha20-Poly1305), both through crypt-io, carry small client-held state: the cookie name is bound into the MAC, an optional expiry is enforced by the server, an optional binding ties a value to one session, and key rings rotate in stages so no node of a cluster refuses a cookie another node just made. For outbound clients there is a <code>Set-Cookie</code> parser that follows the user-agent algorithm and a bounded cookie jar that fails closed on domain cookies without a public suffix list. The whole API, task by task, is in <a href="./docs/API.md"><code>docs/API.md</code></a>.
 </p>
 
 ---
@@ -77,16 +77,16 @@
 
 ```toml
 [dependencies]
-cookie-net = "0.7"
+cookie-net = "0.8"
 
 # signed and encrypted cookies:
-cookie-net = { version = "0.7", features = ["signed", "encrypted"] }
+cookie-net = { version = "0.8", features = ["signed", "encrypted"] }
 
 # an outbound client:
-cookie-net = { version = "0.7", features = ["jar"] }
+cookie-net = { version = "0.8", features = ["jar"] }
 
 # no_std, no allocator:
-cookie-net = { version = "0.7", default-features = false }
+cookie-net = { version = "0.8", default-features = false }
 ```
 
 | Feature | Default | Adds |
@@ -203,7 +203,7 @@ Measured against `cookie`, `biscotti`, and `cookie_store` on the same bytes ([`d
 | jar `Cookie` header | 56% |
 | sealing, opening | about 4 times **slower** than AES-256-GCM: the cipher; XAES-256-GCM is planned |
 
-## Status: hardening (`0.7.1`)
+## Status: alpha (`0.8.0`)
 
 **Done:** the request side, the response side, the session helpers (0.3); signed and encrypted cookies with key rings, staged rotation, fingerprints, expiry, and session binding (0.4); the client parser, the cookie-date algorithm, the cookie jar with a store trait and export, and `Clear-Site-Data` for cookie-bomb recovery (0.5). Each rule tested with its source; property, counting-allocator, complexity, and attack tests; test vectors; nine fuzz targets.
 
@@ -211,7 +211,9 @@ Measured against `cookie`, `biscotti`, and `cookie_store` on the same bytes ([`d
 
 **0.7:** every fuzz target run for 24 hours with no findings, attack tests for every threat T1 to T30, a one-hour jar soak with flat memory, no panic paths in library code (enforced by clippy), and a system clock that fails closed. The threat model is [`docs/SECURITY.md`](./docs/SECURITY.md).
 
-**Next:** `0.8` alpha, when the WASP gates, gate-net, and web-net are built on cookie-net. The schedule is in [`dev/ROADMAP.md`](./dev/ROADMAP.md).
+**0.8:** a simpler API (one way to read a header, one `SameSite` type), parse-net 0.9, and an API reference whose examples run as tests. web-net and the WASP gates (gatekeeper-io) pass their test suites on it. Moving from 0.7 is in [`docs/API.md`](./docs/API.md#migrating-from-07).
+
+**Next:** `0.9` beta: an adversarial review with every finding fixed test-first, then the pre-1.0 polish pass. The schedule is in [`dev/ROADMAP.md`](./dev/ROADMAP.md).
 
 **API stability:** the API was locked at `0.2.0`; names change only with a recorded decision in [`dev/PLAN.md`](./dev/PLAN.md). Measured performance is in [`docs/PERFORMANCE.md`](./docs/PERFORMANCE.md).
 
@@ -227,7 +229,7 @@ Measured against `cookie`, `biscotti`, and `cookie_store` on the same bytes ([`d
 
 ## Documentation
 
-- **[API Reference](./docs/API.md)** - every public item, its version, errors, and examples
+- **[API Reference](./docs/API.md)** - a tour of every public item, its errors, and examples that run as tests
 - **[Which cookie, when](./docs/COOKIES.md)** - session tokens, signed and sealed state, `SameSite`, the rotation runbook
 - **[Formats](./docs/FORMATS.md)** - the byte-exact signed, sealed, and jar export formats, with test vectors
 - **[Architecture](./docs/ARCHITECTURE.md)** - modules, data flow, memory, and bounds

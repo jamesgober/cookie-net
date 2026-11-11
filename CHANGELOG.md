@@ -13,6 +13,29 @@
 
 ---
 
+## [0.8.0] - 2026-11-11
+
+Alpha: a simpler API, parse-net 0.9, and documentation that runs.
+
+### Changed
+
+- **Breaking:** `Cookies::new` is no longer public; `cookie_net::parse` is the
+  one way to read a whole header (`Cookies::with_limits` and
+  `Cookies::from_lines` are unchanged).
+- **Breaking:** `SameSiteAttr` is removed. `SetCookieView::same_site` and
+  `StoredCookie::same_site` are `Option<SameSite>`, where `None` means absent
+  or an unknown value (`SameSiteAttr::Default` before).
+- **Breaking:** parse-net 0.9 (was 0.6.1). `Sink`, `SliceSink`, and `Full`
+  come from parse-net 0.9 now.
+- `docs/API.md` is a task-oriented tour of the API, with a migration note
+  from 0.7. Every example in it and in the README is compiled and run as a
+  doctest.
+
+The signed, sealed, and jar export formats are unchanged: cookies and
+exports made by 0.7 keep working.
+
+---
+
 ## [0.7.1] - 2026-11-02
 
 Dependency floor. No API or format change.
@@ -254,7 +277,8 @@ The scaffold and the plan. No functional code yet.
 - `dev/PLAN.md` (purpose, scope, architecture, threats, ecosystem, open
   decisions, decision log), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 
-[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/jamesgober/cookie-net/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/jamesgober/cookie-net/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/jamesgober/cookie-net/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/jamesgober/cookie-net/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jamesgober/cookie-net/compare/v0.5.0...v0.6.0

@@ -9,7 +9,7 @@
 
 | Needed | For | State (2026-10-22) |
 |---|---|---|
-| parse-net 0.6 (published) | 0.3: byte classes, `find_byte`, `HttpDate`, host syntax, `Sink` | published, 0.6.1 |
+| parse-net 0.9 (published) | 0.3: byte classes, `find_byte`, `HttpDate`, host syntax, `Sink` | published; 0.9.3 required from 0.8 (D-085) |
 | crypt-io 1.2 (published) | 0.4: keyed BLAKE3, `Tag<16>`, HKDF, XChaCha20-Poly1305 | published; 1.2.2 required from 0.7.1 (D-081) |
 | encode-lib | 0.4: base64url | not published; the private interim module is used (PLAN D-008) |
 | url-lib | 0.5: optional, the jar takes URL parts | not needed |
@@ -91,11 +91,15 @@ Exit: `cargo audit` clean on both resolutions. **Met 2026-11-02.**
 
 ## v0.8.0 - Alpha
 
-- [ ] Move to the current parse-net (0.8 at the time of writing). `Sink` and `Full` are in cookie-net's public API, so this is a breaking change and belongs in a 0.x minor, not a patch (D-082). All tests and clippy already pass on parse-net 0.8.
-- [ ] gate-net and the WASP gate owners confirm the session helpers (moved from 0.2).
-- [ ] The WASP gateway credential locator and the gates (login, logout, elevation, rolling tokens) built on cookie-net in a local build; web-net preferences and flash messages on `Signer` and `Sealer`.
+- [x] Move to parse-net 0.9, a breaking change because `Sink` and `Full` are in the public API (D-082, D-085).
+- [x] The simplicity audit against the API standard: `Cookies::new` and `SameSiteAttr` removed as duplicates, with a migration note in `docs/API.md` (D-083).
+- [x] `docs/API.md` rewritten as a task-oriented tour; it and the README run as doctests (D-084).
+- [x] The consumers confirm the session helpers: web-net 0.9.0 and gatekeeper-io 0.4.1 pass their full test suites on cookie-net 0.8 with only the version requirement changed (D-085). gatekeeper-io's own cookie code was on 0.8 (its 18 sign-in tests cover sign-in, sign-out, the second factor, and CSRF); its web-net adapter still pulled web-net's cookie-net 0.7.1 beside it, which works because no cookie-net type crosses between the two.
+- [x] csrf-sec's expectations of the session cookie (`__Host-`, `SameSite=Lax` or stricter, `Secure`, `HttpOnly`, no CSRF cookie) checked against csrf-sec 0.9.4 by `test_csrf_layer_three_expectations`.
 
-Exit: the end-to-end WASP login flow is green with cookie-net; csrf-sec's expectations of the session cookie verified.
+**Moved, with reason:** web-net preferences and flash messages on `Signer` and `Sealer` move to 0.9 consumer adoption. web-net 0.9.0 has no preferences or flash messages yet; cookie-net cannot build them for it.
+
+Exit: the end-to-end WASP login flow is green with cookie-net; csrf-sec's expectations of the session cookie verified. **Met 2026-11-11** (gatekeeper-io's login, sign-out, and elevation tests on cookie-net 0.8).
 
 ## v0.9.0 - Beta
 
@@ -133,4 +137,4 @@ Exit: every item above is fixed or written up in the readiness note; no open ite
 
 ## After 1.0
 
-- SET-20 typed `Priority`; JAR-11 `SharedJar`.
+- A typed `Priority` attribute (a Chromium-only attribute; `extension("Priority=High")` until then); a `SharedJar` (sharded, `loom`-tested) for concurrent clients.
