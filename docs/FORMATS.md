@@ -88,7 +88,7 @@ Key: the 32 ASCII bytes `an example key, 32 bytes long!!!`, under `KeyId(0)` unl
 | signed, expiry | name `prefs`, value `lang=fr`, expires 1,800,000,000 | `AQANPfEAhdsBFt9CEWgSKtEHwEA57glang=fr` |
 | signed, binding | name `cart`, value `c-81731`, binding `session-digest` | `AQAAAAAADU2S5JDhYllf0TPv6lTLiAc-81731` |
 | signed, key id 7, empty value | name `prefs`, value empty | `AQcAAAAAhZgoFuZTF4B7mPpB7mWYrQ` |
-| derived key fingerprint | master `0x42 ^ i` for i in 0..32, context `wasp-web`, signing fingerprint | `aa76cfb6e1d139f8` |
+| derived key fingerprint | master `0x42 ^ i` for i in 0..32, context `app-web`, signing fingerprint | `75788a2a5ce8c61d` |
 
 Sealed values carry a random nonce, so each sealing gives a new value; these two open to `Saved.` under the cookie name `flash`:
 

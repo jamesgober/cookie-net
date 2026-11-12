@@ -272,7 +272,7 @@ assert_eq!((s.pairs, s.skipped, s.empty, s.loose_separators, s.prefixed_duplicat
 
 `shadows` counts pairs whose name is not `name` but equals it ignoring ASCII case, once a `__Host-` or `__Secure-` prefix is removed from either side. For `__Host-sid` that is `__host-sid`, `sid`, `SID`, `__Secure-sid`. cookie-net never sets those names, so seeing one is evidence of a cookie-tossing attempt or a prefix-bypass probe.
 
-`severity_hint()` scores the result from 0 to 40, higher is worse, on the scale WASP's gates use: `One` or `Missing` 0; `Many` on a prefixed name 30, on another name 10; `Truncated` or `HeaderTooLong` 10; plus 5 when there are shadows, capped at 40.
+`severity_hint()` scores the result from 0 to 40, higher is worse: `One` or `Missing` 0; `Many` on a prefixed name 30, on another name 10; `Truncated` or `HeaderTooLong` 10; plus 5 when there are shadows, capped at 40.
 
 ```rust
 use cookie_net::{self as cookie, Limits, Lookup};
@@ -596,7 +596,7 @@ assert_eq!(30 * cookie::DAY, 2_592_000);
 
 ## Keys
 
-Features `signed` or `encrypted`. Keys are 32 bytes from your configuration (WASP: key-vault), the same on every node of a cluster. cookie-net never generates keys: a key made at boot would invalidate every signed cookie at every restart and differ between nodes.
+Features `signed` or `encrypted`. Keys are 32 bytes from your configuration (for example from key-vault), the same on every node of a cluster. cookie-net never generates keys: a key made at boot would invalidate every signed cookie at every restart and differ between nodes.
 
 ### `Key`
 
@@ -610,7 +610,7 @@ Every function that takes a key takes `impl Into<Key>`, so a `[u8; 32]` works di
 use cookie_net::{Key, Sealer, Signer};
 
 let master = b"a master secret from key-vault, at least 32 bytes";
-let key = Key::derive(master, b"wasp-web")?;
+let key = Key::derive(master, b"app-web")?;
 let signer = Signer::new(key.clone())?;
 let sealer = Sealer::new(key)?;                  // a different subkey from the same source
 assert_eq!(format!("{signer:?}").contains("Key("), false);

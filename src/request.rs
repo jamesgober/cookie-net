@@ -619,8 +619,8 @@ pub struct Located<'a> {
 }
 
 impl Located<'_> {
-    /// A suggested severity, 0 to 40, higher is worse (the scale WASP's gates
-    /// use): `One` and `Missing` 0; `Many` 30 on a prefixed name and 10 on
+    /// A suggested severity, 0 to 40, higher is worse:
+    /// `One` and `Missing` 0; `Many` 30 on a prefixed name and 10 on
     /// another; `Truncated` and `HeaderTooLong` 10; plus 5 when there are
     /// shadows; at most 40.
     ///

@@ -81,8 +81,8 @@ impl Key {
     /// use cookie_net::{CookieError, Key, Signer};
     ///
     /// let master = [0x5au8; 64];
-    /// let web = Key::derive(&master, b"wasp-web")?;
-    /// let api = Key::derive(&master, b"wasp-api")?;
+    /// let web = Key::derive(&master, b"app-web")?;
+    /// let api = Key::derive(&master, b"app-api")?;
     /// let (web, api) = (Signer::new(web)?, Signer::new(api)?);
     /// assert_ne!(web.fingerprint(web.signing_key()), api.fingerprint(api.signing_key()));
     /// assert_eq!(Key::derive(&[1u8; 31], b"x").unwrap_err(), CookieError::KeyTooShort);

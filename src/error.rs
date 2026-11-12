@@ -384,8 +384,7 @@ impl Rejected {
         }
     }
 
-    /// A suggested severity, 0 to 40, higher is worse (the scale WASP's gates
-    /// use).
+    /// A suggested severity, 0 to 40, higher is worse.
     ///
     /// # Examples
     ///

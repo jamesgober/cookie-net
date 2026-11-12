@@ -1,4 +1,4 @@
-//! WASP-style session cookies: login, a request, sudo mode, logout. Run with
+//! Session cookies: login, a request, sudo mode, logout. Run with
 //! `cargo run --example 02_sessions`.
 
 use cookie_net::{self as cookie, CookieError, Limits, Lookup, SetCookie};

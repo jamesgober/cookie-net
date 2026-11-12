@@ -1,4 +1,4 @@
-//! WASP-shaped flows: login sets `__Host-sid`, each request locates it, a
+//! Session flows: login sets `__Host-sid`, each request locates it, a
 //! roll replaces it, logout deletes it; csrf-sec's expectations of the session
 //! cookie; HTTP/2 crumbs.
 
