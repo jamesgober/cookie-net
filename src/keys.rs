@@ -376,7 +376,10 @@ impl KeyRing {
 
     /// Makes `key` under `id` the signing key; the previous signing key
     /// becomes `Retired { until: retire_old_at }`, and an `Accepted` entry
-    /// with the same id is replaced (promoted).
+    /// with the same id and the same bytes is promoted. An `Accepted` entry
+    /// with the same id and other bytes stays beside the new key, so
+    /// `with_ring` refuses the ring with `DuplicateKeyId`: a node cannot start
+    /// signing under a staged id with a key the other nodes did not stage.
     ///
     /// # Examples
     ///
@@ -393,6 +396,7 @@ impl KeyRing {
     /// ```
     #[must_use]
     pub fn rotated(mut self, id: KeyId, key: impl Into<Key>, retire_old_at: u64) -> KeyRing {
+        let key = key.into();
         for slot in &mut self.entries {
             match slot {
                 Some(e) if e.role == KeyRole::Signing => {
@@ -400,11 +404,17 @@ impl KeyRing {
                         until: retire_old_at,
                     };
                 }
-                Some(e) if e.id == id && e.role == KeyRole::Accepted => *slot = None,
+                Some(e)
+                    if e.id == id
+                        && e.role == KeyRole::Accepted
+                        && same_bytes(e.key.bytes(), key.bytes()) =>
+                {
+                    *slot = None;
+                }
                 _ => {}
             }
         }
-        self.push(id, KeyRole::Signing, key.into())
+        self.push(id, KeyRole::Signing, key)
     }
 
     /// Removes every key under `id` (a retired key past its time, say).
@@ -516,7 +526,7 @@ impl Slots {
                 });
             }
         }
-        let signing = signing.ok_or(CookieError::RingFull)?;
+        let signing = signing.ok_or(CookieError::NoSigningKey)?;
         Ok(Slots { slots, signing })
     }
 
@@ -596,13 +606,21 @@ pub(crate) fn keyed_hash(subkey: &[u8; KEY_LEN], parts: &[&[u8]]) -> [u8; 32] {
             }
             at += p.len();
         }
-        return blake3_keyed(subkey, buf.get(..at).unwrap_or(&[]));
+        let mac = blake3_keyed(subkey, buf.get(..at).unwrap_or(&[]));
+        // the buffer held the value and the binding: leave no copy behind
+        crypt_io::wipe(&mut buf);
+        return mac;
     }
     let mut m = Blake3Mac::new(subkey);
     for p in parts {
         m.update(p);
     }
     m.finalize()
+}
+
+/// Whether two keys are the same, without stopping at the first difference.
+fn same_bytes(a: &[u8; KEY_LEN], b: &[u8; KEY_LEN]) -> bool {
+    a.iter().zip(b).fold(0u8, |d, (x, y)| d | (x ^ y)) == 0
 }
 
 /// The length prefixes of a name and a binding, as they enter a MAC.
@@ -707,7 +725,7 @@ mod tests {
         let none = KeyRing::new(KeyId(1), k(1)).without(KeyId(1));
         assert_eq!(
             Slots::derive(none, b"x").unwrap_err(),
-            CookieError::RingFull
+            CookieError::NoSigningKey
         );
     }
 

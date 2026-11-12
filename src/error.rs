@@ -103,8 +103,10 @@ pub enum CookieError {
     ContextTooLong,
     /// Two keys in a ring share an id.
     DuplicateKeyId,
-    /// A ring holds more than 8 keys, or no signing key.
+    /// A ring holds more than 8 keys.
     RingFull,
+    /// A key ring has no signing key (all removed with `KeyRing::without`).
+    NoSigningKey,
     /// A retired key's time is after 2156 (a time in milliseconds, say).
     InvalidRetireTime,
     /// crypt-io reported a failure, such as the OS random source failing while
@@ -158,6 +160,7 @@ impl CookieError {
             Self::ContextTooLong => "context_too_long",
             Self::DuplicateKeyId => "duplicate_key_id",
             Self::RingFull => "ring_full",
+            Self::NoSigningKey => "no_signing_key",
             Self::InvalidRetireTime => "invalid_retire_time",
             Self::Crypto => "crypto",
             Self::InvalidJarData => "invalid_jar_data",
@@ -235,7 +238,8 @@ impl fmt::Display for CookieError {
             Self::KeyTooShort => f.write_str("master secret is shorter than 32 bytes"),
             Self::ContextTooLong => f.write_str("key derivation context is over 200 bytes"),
             Self::DuplicateKeyId => f.write_str("two keys in the ring share an id"),
-            Self::RingFull => f.write_str("key ring holds more than 8 keys or no signing key"),
+            Self::RingFull => f.write_str("key ring holds more than 8 keys"),
+            Self::NoSigningKey => f.write_str("key ring has no signing key"),
             Self::InvalidRetireTime => f.write_str("retire time is after 2156"),
             Self::Crypto => f.write_str("cryptographic operation failed"),
             Self::InvalidJarData => f.write_str("cookie jar data is not a valid export"),
@@ -425,7 +429,7 @@ mod tests {
 
     use super::*;
 
-    const ALL: [CookieError; 35] = [
+    const ALL: [CookieError; 36] = [
         CookieError::EmptyName,
         CookieError::InvalidName { at: 1 },
         CookieError::InvalidValue { at: 2 },
@@ -450,6 +454,7 @@ mod tests {
         CookieError::ContextTooLong,
         CookieError::DuplicateKeyId,
         CookieError::RingFull,
+        CookieError::NoSigningKey,
         CookieError::InvalidRetireTime,
         CookieError::Crypto,
         CookieError::InvalidJarData,

@@ -35,7 +35,7 @@ cookie-net reads `Cookie` headers, writes `Set-Cookie` headers, signs and encryp
 | T4 | oversized cookies and headers | `TooLarge` when writing; `HeaderTooLong` before any scan; oversize pairs skipped | `test_t4_*` | 1 ns |
 | T5 | cookie bombing | budgets with truncation reported; the locator fails closed; `CLEAR_SITE_DATA_COOKIES` for recovery | `test_t5_*` | none until it happens |
 | T6 | Unicode or whitespace before a prefixed name (the Hono CVE-2026-39410 class) | names never trimmed beyond SP and HTAB, never Unicode-trimmed; non-token names skipped | `test_t6_*` | none |
-| T7 | a nameless cookie planting `__Host-sid=` | the jar ignores nameless prefixed cookies (rfc6265bis 5.7 step 22); a planted duplicate is reported | `test_t7_*`, jar `NamelessPrefixed` unit tests | none |
+| T7 | a nameless cookie planting `__Host-sid=` | the jar ignores nameless prefixed cookies (rfc6265bis 5.7 step 22); a planted duplicate is reported. A browser that predates step 22 can still send a nameless cookie whose value is `__Host-sid=x`, which reads exactly like a real `__Host-sid` on the server; the defence there is the gateway's, issuing a new session id at every login whatever the incoming cookie said | `test_t7_*`, jar `NamelessPrefixed` unit tests | none |
 | T8 | case variants of prefixes | names compared byte for byte; prefix rules applied case-insensitively when writing; case variants counted as shadows | `test_t8_*` | none |
 | T9 | percent-decoded names | names never decoded | `test_t9_*` | none |
 | T10 | quotes stripped by one component and not another | quotes are part of the value | `test_t10_*` | none |
@@ -52,13 +52,13 @@ cookie-net reads `Cookie` headers, writes `Set-Cookie` headers, signs and encryp
 | T21 | `SameSite=None` or `Partitioned` without `Secure` | refused when building and when storing in the jar | `test_t21_*`, jar unit tests | none |
 | T22 | `Domain` set to a public suffix, an IP address, or a single label | an IP address or a single label is refused when building; a public suffix is refused by the jar, which fails closed without a suffix list (the builder has no list, so `domain("co.uk")` builds, and the browser refuses it) | `test_t22_*`, `test_supercookie_refused_without_a_list` | none |
 | T23 | secrets in logs | `Debug` prints lengths, never values or keys; no `Display` for values; errors carry positions | `test_t23_*`, property tests over random values | none |
-| T24 | memory exhaustion in the jar | `JarLimits`, eviction, 4096 bytes per cookie | `test_t24_*`, `tests/soak.rs` (one hour, flat resident memory) | bounded |
-| T25 | a non-secure origin overwriting a `Secure` cookie in the jar | "leave secure cookies alone" | `test_t25_*`, `test_insecure_origin_cannot_toss_over_a_secure_cookie` | none |
+| T24 | memory or CPU exhaustion in the jar | `JarLimits`, eviction, 4096 bytes per cookie, 1024 per path, 255 per host; `import` in `n log n` with the limits applied once | `test_t24_*`, `tests/soak.rs` (one hour, flat resident memory), `test_jar_import_is_not_quadratic` | bounded |
+| T25 | a non-secure origin overwriting, shadowing, or evicting a `Secure` cookie in the jar | "leave secure cookies alone"; eviction removes non-secure cookies before secure ones (rfc6265bis section 5.7) | `test_t25_*` (including a flood of 60 cookies over HTTP), `test_insecure_origin_cannot_toss_over_a_secure_cookie` | none |
 | T26 | a random-source failure while sealing | crypt-io returns an error; nothing is written; `Crypto` is returned | documented: crypt-io has no hook to make its random source fail; requested (PLAN 13.2) | none |
 | T27 | a valid signed value of one user tossed into another user's browser | optional session binding (`sign_bound`, `seal_bound`) | `test_t27_*`, property tests | 5 ns [est.] |
 | T28 | a credential written with an empty or tiny token by a caller bug | `session_cookie` and `elevated_cookie` refuse tokens under 22 bytes | `test_t28_*` | 1 ns |
 | T29 | an extension attribute read differently by two parsers (`x Max-Age=0`) | extension names must be tokens | `test_t29_*`; found by fuzzing at 0.3 | none |
-| T30 | a tampered jar export | a BLAKE3 checksum plus field-by-field validation as untrusted input | `test_t30_*` (every byte of an export changed), a re-checksummed forgery refused (jar unit tests); fuzz `jar_ops` | none |
+| T30 | a tampered or forged jar export (the checksum is not a MAC) | field-by-field validation as untrusted input, then every record checked against the storage rules (prefixes, `Secure` needs), domain cookies the importing jar's suffix list refuses skipped, times capped at `now`, expiries at 400 days | `test_t30_*` (every byte of an export changed), `test_jar_import_refuses_impossible_records`, `test_jar_import_applies_the_storage_rules`; fuzz `jar_ops` | none |
 
 ## What cookie-net does not defend
 
@@ -70,12 +70,13 @@ cookie-net reads `Cookie` headers, writes `Set-Cookie` headers, signs and encryp
 
 ## Hardening evidence
 
+- An adversarial review at 0.8, three independent reviews (standards conformance against rfc6265bis-22, attacks against this model, edge cases and documentation truth), found 20 defects, none in signed or sealed cookies, keys, base64url, or the server-side reading and writing of cookies. Each is fixed with a regression test that failed before its fix (`tests/review_09.rs`, the T25 flood test), in 0.8.0 for the high one and in 0.9.0 for the rest (dev/PLAN.md D-086). A further independent review of 0.7.1 found one medium and four low issues, three of them among those 20; the other two (the session helpers' exact prefix, and `KeyRing::rotated` checking the staged bytes) are fixed in 0.9.0 the same way (D-088).
 - Fuzzing: every parser and decoder has a target (`cookie_header`, `cookie_lines`, `locate`, `set_cookie_build`, `signed_verify`, `sealed_open`, `parse_set_cookie`, `cookie_date`, `jar_ops`), each run for at least 24 hours on the 0.7.0 code with no findings (the 0.7.0 release notes give the runs). One issue was found at 0.3 (T29) and fixed. The timeouts reported on the shared build machine (one at 0.6, six at 0.7) were the machine, not the code: the 0.7 ones gave a negative elapsed time from a clock step, and every input runs in milliseconds on its own (dev/PLAN.md D-079).
 - Property tests for every invariant of `dev/DIRECTIVES.md` section 4: no builder input breaks a prefix, `SameSite=None`, or `Partitioned` rule; no serialized cookie holds a forbidden byte; any changed bit of a signed or sealed value is refused; a sealed value never opens under another name.
 - Counting-allocator tests prove that reading, writing into a stack buffer, signing, verifying, and opening into a reused buffer allocate nothing.
 - Complexity tests prove linear time on 64 KiB adversarial headers.
 - CI audits the dependency tree on every change, for both the MSRV resolution and the newest one (`cargo audit`, `cargo deny`). RUSTSEC-2026-0385 (`ctutils`) reached the tree through crypt-io, was never reachable from cookie-net, and is gone from 0.7.1, which requires crypt-io 1.2.2 (dev/PLAN.md D-078, D-081).
-- `#![forbid(unsafe_code)]`. Library code cannot panic by construction: clippy denies `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, `dbg!`, and print macros outside tests, and CI runs clippy with warnings as errors. Indexing is bounds-checked by the language; fuzzing finds no panic.
+- `#![forbid(unsafe_code)]`. No panic is reachable from library code: clippy denies `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, `dbg!`, and print macros outside tests, and CI runs clippy with warnings as errors. Indexing is either into fixed-size arrays at fixed offsets or after a length check, and is bounds-checked by the language as well; fuzzing finds no panic.
 - A one-hour jar soak (`tests/soak.rs`) streams random `Set-Cookie` lines for 500 hosts with export and import and checks that resident memory stays flat.
 
 ## Operating guidance

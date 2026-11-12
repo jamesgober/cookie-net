@@ -20,7 +20,7 @@
 
 /// Text length of `n` bytes encoded without padding.
 pub(crate) const fn encoded_len(n: usize) -> usize {
-    (n * 4).div_ceil(3)
+    n.saturating_mul(4).div_ceil(3)
 }
 
 /// Byte length of canonical unpadded text of `n` characters; `None` when no

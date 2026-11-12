@@ -322,6 +322,13 @@ pub enum IgnoreReason {
     PartitionedNeedsSecure,
     /// Already expired, and nothing stored to remove.
     Expired,
+    /// A cross-site response set a cookie that is not `SameSite=None`, and
+    /// the request was not a top-level navigation (section 5.7 step 18).
+    CrossSite,
+    /// The request URL cannot be kept: a host that is empty or not printable
+    /// ASCII, a top-level site likewise, or a cookie path over 1024 bytes or
+    /// with a control character.
+    InvalidRequestUrl,
 }
 
 /// One cookie as a jar stores it. `Debug` prints the value's length only.
@@ -545,7 +552,9 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
     }
 
     /// Stores one `Set-Cookie` line received from `url` at `now`, following
-    /// rfc6265bis section 5.7.
+    /// rfc6265bis section 5.7, for a same-site request (what a client that is
+    /// its own site makes). [`store_for`](Self::store_for) takes the request
+    /// context.
     ///
     /// # Examples
     ///
@@ -565,6 +574,33 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
         set_cookie: &L,
         now: u64,
     ) -> StoreOutcome {
+        self.store_for(url, &RequestContext::same_site(), set_cookie, now)
+    }
+
+    /// As [`store`](Self::store), for the response to a request made in
+    /// context `cx`. A cross-site response's cookie is ignored unless it is
+    /// `SameSite=None` or the request was a top-level navigation (section 5.7
+    /// step 18), and a partitioned cookie is kept under the context's
+    /// top-level site (default: the request host).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cookie_net::{IgnoreReason, Jar, RequestContext, RequestUrl, StoreOutcome};
+    ///
+    /// let mut jar = Jar::new();
+    /// let url = RequestUrl::https("widget.example", "/");
+    /// let embedded = RequestContext::cross_site().top_level_site("shop.example");
+    /// assert_eq!(jar.store_for(&url, &embedded, "a=1; Secure", 0), StoreOutcome::Ignored(IgnoreReason::CrossSite));
+    /// assert_eq!(jar.store_for(&url, &embedded, "b=1; Secure; SameSite=None; Partitioned", 0), StoreOutcome::Stored);
+    /// ```
+    pub fn store_for<L: AsRef<[u8]> + ?Sized>(
+        &mut self,
+        url: &RequestUrl<'_>,
+        cx: &RequestContext<'_>,
+        set_cookie: &L,
+        now: u64,
+    ) -> StoreOutcome {
         let Some(v) = parse_set_cookie(set_cookie) else {
             return StoreOutcome::Ignored(IgnoreReason::Malformed);
         };
@@ -573,6 +609,16 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
         {
             return StoreOutcome::Ignored(IgnoreReason::NamelessPrefixed);
         }
+        let host = url.host.to_ascii_lowercase();
+        let site = cx
+            .top_level_site
+            .map_or_else(|| host.clone(), str::to_ascii_lowercase);
+        if !keepable_host(&host) || !keepable_host(&site) {
+            return StoreOutcome::Ignored(IgnoreReason::InvalidRequestUrl);
+        }
+        // An expired cookie may go at any time (section 5.7); here it would
+        // otherwise block a replacement or give it its creation time.
+        self.remove_expired(now);
         let cap = now.saturating_add(MAX_LIFETIME);
         let expiry = match (v.max_age, v.expires) {
             (Some(secs), _) => Some(if secs <= 0 {
@@ -583,14 +629,22 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
             (None, Some(t)) => Some(u64::try_from(t).unwrap_or(0).min(cap)),
             (None, None) => None,
         };
-        let host = url.host.to_ascii_lowercase();
-        let (domain, host_only) = match v.domain {
+        // `Domain=.` leaves an empty domain attribute: a host-only cookie
+        // (section 5.7 step 10).
+        let (domain, host_only) = match v.domain.filter(|d| !d.is_empty()) {
             Some(d) => {
                 let Ok(d) = core::str::from_utf8(d) else {
                     return StoreOutcome::Ignored(IgnoreReason::DomainMismatch);
                 };
                 let d = d.to_ascii_lowercase();
-                if self.suffixes.is_public_suffix(&d) {
+                if is_ip(&host) {
+                    // an IP address only ever gets host-only cookies
+                    if d == host {
+                        (host.clone(), true)
+                    } else {
+                        return StoreOutcome::Ignored(IgnoreReason::DomainMismatch);
+                    }
+                } else if self.suffixes.is_public_suffix(&d) {
                     if d == host {
                         (host.clone(), true)
                     } else {
@@ -608,11 +662,17 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
             Some(p) => p.to_vec(),
             None => default_path(url.path.as_bytes()).to_vec(),
         };
+        if !keepable_path(&path) {
+            return StoreOutcome::Ignored(IgnoreReason::InvalidRequestUrl);
+        }
         if v.secure && !url.secure {
             return StoreOutcome::Ignored(IgnoreReason::SecureFromInsecure);
         }
         if v.same_site == Some(SameSite::None) && !v.secure {
             return StoreOutcome::Ignored(IgnoreReason::SameSiteNoneNeedsSecure);
+        }
+        if !cx.same_site && !cx.navigation && v.same_site != Some(SameSite::None) {
+            return StoreOutcome::Ignored(IgnoreReason::CrossSite);
         }
         if v.partitioned && !v.secure {
             return StoreOutcome::Ignored(IgnoreReason::PartitionedNeedsSecure);
@@ -620,13 +680,18 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
         if starts_with_ci(v.name, b"__Secure-") && !v.secure {
             return StoreOutcome::Ignored(IgnoreReason::SecurePrefix);
         }
-        if starts_with_ci(v.name, b"__Host-") && !(v.secure && host_only && v.path == Some(b"/")) {
+        // A `Path` attribute must be present, and the cookie's path, after a
+        // value that does not start with `/` fell back to the default path,
+        // must be `/` (sections 5.6.4 and 5.7 step 21).
+        if starts_with_ci(v.name, b"__Host-")
+            && !(v.secure && host_only && v.has_path && path == b"/")
+        {
             return StoreOutcome::Ignored(IgnoreReason::HostPrefix);
         }
         if !v.secure && !url.secure && self.shadows_secure(v.name, &domain, &path) {
             return StoreOutcome::Ignored(IgnoreReason::WouldShadowSecure);
         }
-        let partition = v.partitioned.then(|| host.clone());
+        let partition = v.partitioned.then_some(site);
         let old = (0..self.store.len()).find(|&i| {
             self.store.get(i).is_some_and(|c| {
                 c.name == v.name
@@ -745,13 +810,14 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
         cx: &RequestContext<'_>,
         now: u64,
     ) -> Option<String> {
+        // Names and values come from Set-Cookie lines with no controls; they
+        // may hold any other byte, which a `String` cannot, so a cookie that
+        // is not UTF-8 is left out here (`write_cookie_header` writes it).
         let mut out = Vec::new();
-        let n = self.write_cookie_header(url, cx, now, &mut out).ok()?;
+        let n = self.write_header(url, cx, now, &mut out, true).ok()?;
         if n == 0 {
             return None;
         }
-        // Names and values come from Set-Cookie lines with no controls; they
-        // may hold any other byte, which a `String` cannot.
         String::from_utf8(out).ok()
     }
 
@@ -782,6 +848,20 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
         now: u64,
         out: &mut impl Sink,
     ) -> Result<usize, CookieError> {
+        self.write_header(url, cx, now, out, false)
+    }
+
+    /// The cookies for a request, in order (section 5.8.3), written into
+    /// `out`; with `text_only`, cookies whose name or value is not UTF-8 are
+    /// left out. Last-access times are updated for the cookies written.
+    fn write_header(
+        &mut self,
+        url: &RequestUrl<'_>,
+        cx: &RequestContext<'_>,
+        now: u64,
+        out: &mut impl Sink,
+        text_only: bool,
+    ) -> Result<usize, CookieError> {
         let host = url.host.to_ascii_lowercase();
         let path = if url.path.is_empty() { "/" } else { url.path }.as_bytes();
         let site = cx
@@ -805,13 +885,17 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
                                 _ => cx.navigation && cx.safe_method,
                             })
                         && c.partition.as_ref().is_none_or(|p| *p == site)
+                        && (!text_only
+                            || (core::str::from_utf8(&c.name).is_ok()
+                                && core::str::from_utf8(&c.value).is_ok()))
                 })
             })
             .collect();
+        // longer paths first, then earlier creation (section 5.8.3 step 2)
         picked.sort_by_key(|&i| {
-            self.store
-                .get(i)
-                .map_or((0, 0), |c| (usize::MAX - c.path.len(), c.seq))
+            self.store.get(i).map_or((0, 0, 0), |c| {
+                (usize::MAX - c.path.len(), c.creation, c.seq)
+            })
         });
         let len: usize = picked
             .iter()
@@ -954,14 +1038,23 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
         export::write(cookies.into_iter(), self.len())
     }
 
-    /// Adds the cookies of an exported jar, skipping those expired at `now`;
-    /// the jar's bounds apply. Returns how many were added. The bytes are
-    /// checked as untrusted input.
+    /// Adds the cookies of an exported jar. The bytes are untrusted input:
+    /// the format and every field are checked, and a record that no `store`
+    /// could have made (a `__Host-` cookie that is not host-only, `Secure`,
+    /// and `Path=/`, say) fails the whole import. Records expired at `now`,
+    /// and domain cookies this jar's public suffix list does not allow, are
+    /// skipped. An imported cookie replaces a stored one with the same name,
+    /// domain, host-only flag, path, and partition, keeping its creation
+    /// time; times in the file later than `now` are brought back to `now`,
+    /// and expiries are capped at 400 days. The jar's limits then apply, in
+    /// the eviction order of [`store`](Self::store). Costs `n log n` in the
+    /// number of cookies, and rewrites the store. Returns how many imported
+    /// cookies were kept.
     ///
     /// # Errors
     ///
     /// [`CookieError::InvalidJarData`] for a wrong magic, version, checksum,
-    /// length, or field; nothing is added then.
+    /// length, field, or an impossible record; nothing is added then.
     ///
     /// # Examples
     ///
@@ -971,20 +1064,95 @@ impl<P: PublicSuffix, S: JarStore> Jar<P, S> {
     /// assert_eq!(Jar::new().import(b"not a jar", 0).unwrap_err(), CookieError::InvalidJarData);
     /// ```
     pub fn import(&mut self, bytes: &[u8], now: u64) -> Result<usize, CookieError> {
-        let cookies = export::read(bytes)?;
-        let mut added = 0;
-        for mut c in cookies {
-            if c.expiry.is_some_and(|e| e <= now) {
+        let records = export::read(bytes)?;
+        if !records.iter().all(could_be_stored) {
+            return Err(CookieError::InvalidJarData);
+        }
+        let cap = now.saturating_add(MAX_LIFETIME);
+        let mut all: Vec<Option<StoredCookie>> =
+            Vec::with_capacity(self.store.len() + records.len());
+        while let Some(c) = self.store.swap_remove(self.store.len().wrapping_sub(1)) {
+            if c.expiry.is_none_or(|e| e > now) {
+                all.push(Some(c));
+            }
+        }
+        // the jar's cookies in their creation order, then the file's
+        all.sort_by_key(|c| c.as_ref().map_or(0, |c| c.seq));
+        let existing = all.len();
+        for mut c in records {
+            if c.expiry.is_some_and(|e| e <= now)
+                || (!c.host_only && (is_ip(&c.domain) || self.suffixes.is_public_suffix(&c.domain)))
+            {
                 continue;
             }
+            c.expiry = c.expiry.map(|e| e.min(cap));
+            c.creation = c.creation.min(now);
+            c.last_access = c.last_access.min(now);
             c.seq = self.next_seq;
             self.next_seq = self.next_seq.saturating_add(1);
-            let domain = c.domain.clone();
-            self.store.push(c);
-            added += 1;
-            self.evict(now, &domain);
+            all.push(Some(c));
         }
-        Ok(added)
+        // one cookie per identity: the last one wins, with the first one's
+        // creation time and order
+        let mut order: Vec<usize> = (0..all.len()).collect();
+        order.sort_by(|&a, &b| identity(&all[a]).cmp(&identity(&all[b])).then(a.cmp(&b)));
+        let mut k = 0;
+        while k < order.len() {
+            let mut end = k + 1;
+            while end < order.len() && identity(&all[order[end]]) == identity(&all[order[k]]) {
+                end += 1;
+            }
+            let first = all[order[k]].as_ref().map(|c| (c.creation, c.seq));
+            if let (Some((creation, seq)), Some(last)) = (first, all[order[end - 1]].as_mut()) {
+                last.creation = creation;
+                last.seq = seq;
+            }
+            for &dropped in &order[k..end - 1] {
+                all[dropped] = None;
+            }
+            k = end;
+        }
+        // the limits, once: per domain, then in all, keeping the cookies the
+        // eviction order keeps longest
+        let keep_key = |c: &StoredCookie| (c.secure, c.last_access, c.seq);
+        let mut alive: Vec<usize> = (0..all.len()).filter(|&i| all[i].is_some()).collect();
+        alive.sort_by(|&a, &b| {
+            let (x, y) = (all[a].as_ref(), all[b].as_ref());
+            x.map(|c| &c.domain)
+                .cmp(&y.map(|c| &c.domain))
+                .then_with(|| y.map(keep_key).cmp(&x.map(keep_key)))
+        });
+        let per_domain = usize::from(self.limits.per_domain);
+        let mut run = 0;
+        for w in 0..alive.len() {
+            let same = w > 0
+                && all[alive[w]].as_ref().map(|c| &c.domain)
+                    == all[alive[w - 1]].as_ref().map(|c| &c.domain);
+            run = if same { run + 1 } else { 1 };
+            if run > per_domain {
+                all[alive[w]] = None;
+            }
+        }
+        let total = usize::try_from(self.limits.total).unwrap_or(usize::MAX);
+        let mut alive: Vec<usize> = (0..all.len()).filter(|&i| all[i].is_some()).collect();
+        if alive.len() > total {
+            alive.sort_by(|&a, &b| {
+                all[b]
+                    .as_ref()
+                    .map(keep_key)
+                    .cmp(&all[a].as_ref().map(keep_key))
+            });
+            for &i in &alive[total..] {
+                all[i] = None;
+            }
+        }
+        let kept = all[existing..].iter().filter(|c| c.is_some()).count();
+        let mut survivors: Vec<StoredCookie> = all.into_iter().flatten().collect();
+        survivors.sort_by_key(|c| c.seq);
+        for c in survivors {
+            self.store.push(c);
+        }
+        Ok(kept)
     }
 
     fn shadows_secure(&self, name: &[u8], domain: &str, path: &[u8]) -> bool {
@@ -1060,6 +1228,48 @@ impl<P: PublicSuffix, S: JarStore> fmt::Debug for Jar<P, S> {
             .field("limits", &self.limits)
             .finish_non_exhaustive()
     }
+}
+
+/// A host or top-level site the jar can keep and export: 1 to 255 printable
+/// ASCII bytes.
+fn keepable_host(host: &str) -> bool {
+    (1..=255).contains(&host.len()) && host.bytes().all(|b| b.is_ascii_graphic())
+}
+
+/// A cookie path the jar can keep and export: at most 1024 bytes (the
+/// attribute limit of section 5.6), no control character.
+fn keepable_path(path: &[u8]) -> bool {
+    path.len() <= 1024 && !path.iter().any(|&b| b < 0x20 || b == 0x7f)
+}
+
+/// Whether some `store` could have made this cookie: the rules that do not
+/// depend on the jar (its suffix list) or the time.
+fn could_be_stored(c: &StoredCookie) -> bool {
+    let nameless_prefixed = c.name.is_empty()
+        && (starts_with_ci(&c.value, b"__Secure-") || starts_with_ci(&c.value, b"__Host-"));
+    !nameless_prefixed
+        && keepable_host(&c.domain)
+        && keepable_path(&c.path)
+        && c.partition.as_deref().is_none_or(keepable_host)
+        && (c.secure || (c.same_site != Some(SameSite::None) && c.partition.is_none()))
+        && (c.secure || !starts_with_ci(&c.name, b"__Secure-"))
+        && (!starts_with_ci(&c.name, b"__Host-") || (c.secure && c.host_only && c.path == b"/"))
+}
+
+/// What makes two cookies the same cookie (section 5.7 step 23), and the
+/// partition.
+type Identity<'c> = Option<(&'c [u8], &'c str, bool, &'c [u8], Option<&'c str>)>;
+
+fn identity(c: &Option<StoredCookie>) -> Identity<'_> {
+    c.as_ref().map(|c| {
+        (
+            &c.name[..],
+            c.domain.as_str(),
+            c.host_only,
+            &c.path[..],
+            c.partition.as_deref(),
+        )
+    })
 }
 
 fn starts_with_ci(s: &[u8], prefix: &[u8]) -> bool {
@@ -1238,8 +1448,7 @@ mod export {
                 && no_controls(value)
                 && !domain.is_empty()
                 && path.first() == Some(&b'/')
-                && path.len() <= 1024
-                && no_controls(path)
+                && super::keepable_path(path)
                 && (flags & 0x10 != 0) != partition.is_empty();
             if !ok {
                 return Err(CookieError::InvalidJarData);

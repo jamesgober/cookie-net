@@ -125,7 +125,9 @@ fn checked(name: &str, token: &str) -> Result<(), CookieError> {
             at: crate::error::at(i),
         });
     }
-    if name::of_bytes(n) != Prefix::Host {
+    // The exact bytes: a browser reads `__host-` as `__Host-`, but the server
+    // compares names byte for byte, so it would never read its own cookie.
+    if name::of_bytes(n) != Prefix::Host || !n.starts_with(b"__Host-") {
         return Err(CookieError::HostPrefix);
     }
     if token.len() < MIN_TOKEN {
@@ -190,7 +192,11 @@ mod tests {
             session_cookie("__Host-sid", TOKEN, MAX_LIFETIME + 1).unwrap_err(),
             CookieError::MaxAgeOutOfRange
         );
-        assert!(session_cookie("__host-sid", TOKEN, HOUR).is_ok());
+        // the exact prefix: the server reads names byte for byte
+        assert_eq!(
+            session_cookie("__host-sid", TOKEN, HOUR).unwrap_err(),
+            CookieError::HostPrefix
+        );
     }
 
     #[test]

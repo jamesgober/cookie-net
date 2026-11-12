@@ -90,7 +90,8 @@ impl Sealer {
     ///
     /// # Errors
     ///
-    /// `DuplicateKeyId`, `RingFull`, `WeakKey`, `InvalidRetireTime`, `Crypto`.
+    /// `DuplicateKeyId`, `RingFull`, `NoSigningKey`, `WeakKey`,
+    /// `InvalidRetireTime`, `Crypto`.
     ///
     /// # Examples
     ///
@@ -207,7 +208,8 @@ impl Sealer {
         bound_to: &[u8],
     ) -> Result<String, CookieError> {
         let mut scratch = Vec::new();
-        let mut out = Vec::with_capacity(self.sealed_len(plaintext.len()));
+        // `seal_into` refuses anything over a cookie's 4096 bytes
+        let mut out = Vec::with_capacity(self.sealed_len(plaintext.len()).min(PAIR_MAX));
         self.seal_into(name, plaintext, expires, bound_to, &mut scratch, &mut out)?;
         // base64url text: ASCII.
         String::from_utf8(out).map_err(|_| CookieError::Crypto)
@@ -241,11 +243,14 @@ impl Sealer {
         out: &mut impl Sink,
     ) -> Result<(), CookieError> {
         keys::check_name(name)?;
-        if plaintext.len() > self.max_plaintext(name.len()) {
+        // the cookie, name and sealed value, fits in 4096 bytes (section 5.6)
+        if plaintext.len() > self.max_plaintext(name.len())
+            || name.len().saturating_add(self.sealed_len(plaintext.len())) > PAIR_MAX
+        {
             return Err(CookieError::TooLarge);
         }
         let exp = keys::encode_expiry(expires)?;
-        let slot = self.slots.signing().ok_or(CookieError::RingFull)?;
+        let slot = self.slots.signing().ok_or(CookieError::NoSigningKey)?;
         let text_len = self.sealed_len(plaintext.len());
         if out.remaining().is_some_and(|room| room < text_len) {
             return Err(CookieError::Full);
