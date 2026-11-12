@@ -33,7 +33,7 @@
 
 - The token is 32 random bytes from the operating system, base64url (43 characters), issued by gate-net. cookie-net refuses a token under 22 bytes, which catches a user id or an empty string passed by mistake.
 - Issue a new token at every login (session fixation defence) and at every roll.
-- `Max-Age` is the session's absolute lifetime (WASP: 12 hours), so a browser left open drops the token; the server enforces idle and absolute limits anyway.
+- `Max-Age` is the session's absolute lifetime (for example 12 hours), so a browser left open drops the token; the server enforces idle and absolute limits anyway.
 - Logout revokes the session on the server first, then sends `SetCookie::delete("__Host-sid")`. Correctness never depends on the browser obeying the removal.
 
 ## The `__Host-` rule

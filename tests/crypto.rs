@@ -1,5 +1,5 @@
 //! Signed and encrypted cookies: properties (dev/DIRECTIVES.md section 4),
-//! a two-node rotation simulation, and the flows WASP uses them for.
+//! a two-node rotation simulation, and the flows a web service uses them for.
 
 #![cfg(all(feature = "signed", feature = "encrypted"))]
 
@@ -162,8 +162,8 @@ fn test_one_master_many_services() {
         .enumerate()
         .map(|(i, b)| b ^ i as u8)
         .collect::<Vec<u8>>();
-    let web = Key::derive(&master, b"wasp-web").unwrap();
-    let api = Key::derive(&master, b"wasp-api").unwrap();
+    let web = Key::derive(&master, b"app-web").unwrap();
+    let api = Key::derive(&master, b"app-api").unwrap();
     let (web_signer, api_signer) = (Signer::new(web.clone()).unwrap(), Signer::new(api).unwrap());
     let v = web_signer.sign("prefs", "x").unwrap();
     assert_eq!(api_signer.verify("prefs", &v, NOW), Err(Rejected::BadTag));

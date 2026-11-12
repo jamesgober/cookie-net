@@ -211,7 +211,7 @@ Measured against `cookie`, `biscotti`, and `cookie_store` on the same bytes ([`d
 
 **0.7:** every fuzz target run for 24 hours with no findings, attack tests for every threat T1 to T30, a one-hour jar soak with flat memory, no panic paths in library code (enforced by clippy), and a system clock that fails closed. The threat model is [`docs/SECURITY.md`](./docs/SECURITY.md).
 
-**0.8:** a simpler API (one way to read a header, one `SameSite` type), parse-net 0.9, and an API reference whose examples run as tests. web-net and the WASP gates (gatekeeper-io) pass their test suites on it. Moving from 0.7 is in [`docs/API.md`](./docs/API.md#migrating-from-07).
+**0.8:** a simpler API (one way to read a header, one `SameSite` type), parse-net 0.9, and an API reference whose examples run as tests. web-net and gatekeeper-io pass their test suites on it. Moving from 0.7 is in [`docs/API.md`](./docs/API.md#migrating-from-07).
 
 **0.9:** three independent reviews (standards, attacks, edge cases) found 20 defects, almost all in the client jar; every one is fixed with a test that failed before its fix. The jar gained `store_for` for cross-site and embedded responses.
 

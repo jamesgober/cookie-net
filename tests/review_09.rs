@@ -347,7 +347,7 @@ fn test_sealer_size_limits_hold_for_long_names() {
     let _ = s.sealed_len(usize::MAX);
 }
 
-// The independent review of 0.7.1 (`_strategy` review F-1 to F-10). F-1,
+// The independent review of 0.7.1 (F-1 to F-10). F-1,
 // F-2, and F-4 are the import and partition tests above.
 
 /// F-3: the session helpers take the exact `__Host-` prefix only. A

@@ -7,7 +7,7 @@ fn main() -> Result<(), CookieError> {
     let now = 1_800_000_000;
     // one master from key-vault; each service derives its own key
     let master: Vec<u8> = (0u8..32).map(|i| i.wrapping_mul(37) ^ 0x5a).collect();
-    let key = Key::derive(&master, b"wasp-web")?;
+    let key = Key::derive(&master, b"app-web")?;
     let signer = Signer::new(key.clone())?;
     let sealer = Sealer::new(key)?;
 

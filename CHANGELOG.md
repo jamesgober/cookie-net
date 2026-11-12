@@ -277,7 +277,7 @@ Plain cookies: the request side, the response side, and the session helpers.
   constants `MINUTE`, `HOUR`, `DAY`, `MAX_LIFETIME`.
 - Tests: one per rfc6265bis rule with its section; attack tests for threats
   T1 to T13, T19 to T23, and T28; property tests; counting-allocator tests;
-  complexity tests; WASP-shaped flows. Fuzz targets `cookie_header`,
+  complexity tests; login and logout flows. Fuzz targets `cookie_header`,
   `cookie_lines`, `locate`, `set_cookie_build`, each run for one hour clean;
   `set_cookie_build` first found extension names with spaces (`x Max-Age=0`),
   now refused: an extension's name must be a token.

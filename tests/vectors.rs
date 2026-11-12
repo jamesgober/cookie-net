@@ -56,13 +56,13 @@ fn test_sealed_vectors_open() {
 #[test]
 fn test_derived_key_vector() {
     let master: Vec<u8> = (0u8..32).map(|i| 0x42 ^ i).collect();
-    let k = Key::derive(&master, b"wasp-web").unwrap();
+    let k = Key::derive(&master, b"app-web").unwrap();
     assert_eq!(
         Signer::new(k)
             .unwrap()
             .fingerprint(KeyId(0))
             .unwrap()
             .to_string(),
-        "aa76cfb6e1d139f8"
+        "75788a2a5ce8c61d"
     );
 }

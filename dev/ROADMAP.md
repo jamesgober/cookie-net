@@ -28,7 +28,7 @@ Exit: crate on crates.io; CI green on every platform (done).
 - [x] `dev/PLAN.md` rewritten from the specification; its differences recorded as decisions (D-004 to D-042).
 - [x] Open decisions CN-1 to CN-11 closed (CN-1 by James).
 - [x] James approved the API (2026-10-23); 0.2.0 published the same day.
-- [ ] gate-net and the WASP gates confirm the session helpers match gate-net's session design (requests recorded in PLAN 13.2). **Moved to 0.8 (alpha)**, where the WASP gates are built on cookie-net: neither has code yet, and the helpers follow gate-net's written design and James's X-6 decision.
+- [ ] gate-net and the sign-in gates confirm the session helpers match gate-net's session design (requests recorded in PLAN 13.2). **Moved to 0.8 (alpha)**, where the sign-in gates are built on cookie-net: neither has code yet, and the helpers follow gate-net's written design and James's X-6 decision.
 
 Exit: the API is approved (done). Then the release routine for 0.2.0 (no code beyond `VERSION`).
 
@@ -111,12 +111,12 @@ Exit: `cargo audit` clean on both resolutions. **Met 2026-11-02.**
 
 **Moved, with reason:** web-net preferences and flash messages on `Signer` and `Sealer` move to 0.9 consumer adoption. web-net 0.9.0 has no preferences or flash messages yet; cookie-net cannot build them for it.
 
-Exit: the end-to-end WASP login flow is green with cookie-net; csrf-sec's expectations of the session cookie verified. **Met 2026-11-11** (gatekeeper-io's login, sign-out, and elevation tests on cookie-net 0.8).
+Exit: the end-to-end login flow is green with cookie-net; csrf-sec's expectations of the session cookie verified. **Met 2026-11-11** (gatekeeper-io's login, sign-out, and elevation tests on cookie-net 0.8).
 
 ## v0.9.0 - Beta
 
 - [x] Every finding of the adversarial review (three independent reviews at 0.8: standards conformance, attacks, edge cases) fixed test-first: each has a regression test in `tests/review_09.rs` that failed on 0.8.0 (D-086, D-087).
-- [x] The consumers use it end to end: web-net 0.9 (`get_unique`, `SetCookie`) and gatekeeper-io (the WASP gates' sign-in, sign-out, and elevation through `session_cookie`, `SetCookie::delete`, `get_unique`), whose suites pass on cookie-net 0.8 (D-085). fetch-net does not exist yet, so the jar has no consumer.
+- [x] The consumers use it end to end: web-net 0.9 (`get_unique`, `SetCookie`) and gatekeeper-io (sign-in, sign-out, and elevation through `session_cookie`, `SetCookie::delete`, `get_unique`), whose suites pass on cookie-net 0.8 (D-085). fetch-net does not exist yet, so the jar has no consumer.
 - [x] API frozen except fixes: 0.9 adds `Jar::store_for`, two `IgnoreReason` variants, and `SetCookieView::has_path`, all needed by review fixes (D-087).
 
 Exit: an adversarial review with every finding fixed test-first. **Met 2026-11-11.**
